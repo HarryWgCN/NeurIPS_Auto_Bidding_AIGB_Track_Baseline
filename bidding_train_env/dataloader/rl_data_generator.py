@@ -12,7 +12,7 @@ class RlDataGenerator:
     Reads raw data and constructs training data suitable for reinforcement learning.
     """
 
-    def __init__(self, file_folder_path="./data/traffic"):
+    def __init__(self, file_folder_path="/home/disk2/auto-bidding/data/traffic"):
 
         self.file_folder_path = file_folder_path
         self.training_data_path = self.file_folder_path + "/" + "training_data_rlData_folder"
@@ -156,7 +156,7 @@ class RlDataGenerator:
 
 
 def generate_rl_data():
-    file_folder_path = "./data/traffic"
+    file_folder_path = "/home/disk2/auto-bidding/data/traffic"
     data_loader = RlDataGenerator(file_folder_path=file_folder_path)
     data_loader.batch_generate_rl_data()
 

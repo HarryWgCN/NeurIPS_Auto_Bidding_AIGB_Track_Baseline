@@ -12,7 +12,7 @@ class TestDataLoader:
     Offline evaluation data loader.
     """
 
-    def __init__(self, file_path="./data/log.csv"):
+    def __init__(self, file_path="/home/disk2/auto-bidding/data/log.csv"):
         """
         Initialize the data loader.
         Args:

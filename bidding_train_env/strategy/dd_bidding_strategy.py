@@ -19,14 +19,13 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser.pt")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER()
-        self.model.load_net(model_path,device =self.device)
+        self.model.load_net(model_path, device=self.device)
         self.state_dim = 16
-        self.input = np.zeros((48,self.state_dim+1))
-
+        self.input = np.zeros((48, self.state_dim + 1))
 
     def reset(self):
         self.remaining_budget = self.budget
-        self.input = np.zeros((48, self.state_dim+1))
+        self.input = np.zeros((48, self.state_dim + 1))
 
     def bidding(self, timeStepIndex, pValues, pValueSigmas, historyPValueInfo, historyBid,
                 historyAuctionResult, historyImpressionResult, historyLeastWinningCost):
@@ -94,13 +93,12 @@ class DdBiddingStrategy(BaseBiddingStrategy):
             historical_pv_num_total
         ])
 
-
         for i in range(self.state_dim):
-            self.input[timeStepIndex,i] = test_state[i]
-        self.input[:,-1] = timeStepIndex
+            self.input[timeStepIndex, i] = test_state[i]
+        self.input[:, -1] = timeStepIndex
         x = torch.tensor(self.input.reshape(-1), device=self.device)
-        alpha  = self.model(x)
+        alpha = self.model(x)
         alpha = alpha.item()
-        alpha = max(0,alpha)
+        alpha = max(0, alpha)
         bids = alpha * pValues
         return bids
