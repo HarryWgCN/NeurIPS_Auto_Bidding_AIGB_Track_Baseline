@@ -18,7 +18,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         dir_name = os.path.dirname(dir_name)
         model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser.pt")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model = DFUSER()
+        self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)
         self.state_dim = 16
         self.input = np.zeros((48, self.state_dim + 1))

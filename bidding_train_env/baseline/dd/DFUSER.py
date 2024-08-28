@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops.layers.torch import Rearrange
+from bidding_train_env.baseline.dit.diffusion_transformer import DiT_S_8
 
 
 class SinusoidalPosEmb(nn.Module):
@@ -506,15 +507,16 @@ class DFUSER(nn.Module):
         self.network_random_seed = network_random_seed
         self.step_len = step_len
 
-        model = TemporalUnet(
-            horizon=step_len,
-            transition_dim=dim_obs,
-            cond_dim=dim_actions,
-            returns_condition=True,
-            dim=128,
-            condition_dropout=0.25,
-            calc_energy=False
-        )
+        # model = TemporalUnet(
+        #     horizon=step_len,
+        #     transition_dim=dim_obs,
+        #     cond_dim=dim_actions,
+        #     returns_condition=True,
+        #     dim=128,
+        #     condition_dropout=0.25,
+        #     calc_energy=False
+        # )
+        model = DiT_S_8(step_len, dim_obs)
 
         self.diffuser = GaussianInvDynDiffusion(
             model=model,
@@ -602,10 +604,10 @@ class DFUSER(nn.Module):
         actions = actions.detach().cpu()[0]  # .cpu().data.numpy()
         return actions
 
-    def save_net(self, save_path, epi):
-        if not os.path.isdir(save_path):
-            os.makedirs(save_path)
-        torch.save(self.diffuser.state_dict(), f'{save_path}/diffuser.pt')
+    def save_net(self, save_dir, epi):
+        if not os.path.isdir(save_dir):
+            os.makedirs(save_dir)
+        torch.save(self.diffuser.state_dict(), f'{save_dir}/diffuser{epi}.pt')
 
     def save_model(self, save_path, epi):
         if not os.path.isdir(save_path):

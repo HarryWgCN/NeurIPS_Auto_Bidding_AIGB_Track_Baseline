@@ -9,8 +9,12 @@ import torch
 class aigb_dataset(Dataset):
     def __init__(self, step_len, **kwargs) -> None:
         super().__init__()
+        # TODO change to full set
         states, actions, rewards, terminals = load_local_data_nips(
             train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data.csv")
+        # states, actions, rewards, terminals = load_local_data_nips(
+        #     train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data_truncated.csv")
+
         self.states = states
         self.actions = actions
         self.rewards = rewards

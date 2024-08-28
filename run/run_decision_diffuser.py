@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 
 def run_decision_diffuser(
-        save_path="saved_model/DDtest",
+        save_dir="/home/wanghaorui-22/projects/auto-bidding/saved_model/DDtest",
         train_epoch=1,
         batch_size=1000):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -47,7 +47,8 @@ def run_decision_diffuser(
             epi += 1
 
     # algorithm.save_model(save_path, epi)
-    algorithm.save_net(save_path, epi)
+    algorithm.save_net(save_dir, train_epoch)
+    print(f'Model saved to {save_dir}')
 
 
 if __name__ == '__main__':
