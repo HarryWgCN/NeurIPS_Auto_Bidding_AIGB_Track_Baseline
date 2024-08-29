@@ -14,6 +14,55 @@ import torch.nn as nn
 import numpy as np
 import math
 from timm.models.vision_transformer import PatchEmbed, Attention, Mlp
+import torch.nn.functional as F
+
+
+class RotaryPositionalEmbeddings(nn.Module):
+    """
+        Rope Embeds for bidding time.
+    """
+    def __init__(self, d: int, base: int = 10_000):
+        super().__init__()
+        self.base = base
+        self.d = d
+        self.cos_cached = None
+        self.sin_cached = None
+
+    def _build_cache(self, x: torch.Tensor):
+        if self.cos_cached is not None and x.shape[0] <= self.cos_cached.shape[0]:
+            return
+
+        seq_len = x.shape[0]
+
+        theta = 1. / (self.base ** (torch.arange(0, self.d, 2).float() / self.d)).to(
+            x.device)  # THETA = 10,000^(-2*i/d) or 1/10,000^(2i/d)
+
+        seq_idx = torch.arange(seq_len, device=x.device).float().to(x.device)  # Position Index -> [0,1,2...seq-1]
+
+        idx_theta = torch.einsum('n,d->nd', seq_idx,
+                                 theta)  # Calculates m*(THETA) = [ [0, 0...], [THETA_1, THETA_2...THETA_d/2], ... [seq-1*(THETA_1), seq-1*(THETA_2)...] ]
+
+        idx_theta2 = torch.cat([idx_theta, idx_theta],
+                               dim=1)  # [THETA_1, THETA_2...THETA_d/2] -> [THETA_1, THETA_2...THETA_d]
+
+        self.cos_cached = idx_theta2.cos()[:, None, None, :]  # Cache [cosTHETA_1, cosTHETA_2...cosTHETA_d]
+        self.sin_cached = idx_theta2.sin()[:, None, None, :]  # cache [sinTHETA_1, sinTHETA_2...sinTHETA_d]
+
+    def _neg_half(self, x: torch.Tensor):
+        d_2 = self.d // 2  #
+
+        return torch.cat([-x[:, :, :, d_2:], x[:, :, :, :d_2]],
+                         dim=-1)  # [x_1, x_2,...x_d] -> [-x_d/2, ... -x_d, x_1, ... x_d/2]
+
+    def forward(self, x: torch.Tensor):
+        self._build_cache(x)
+
+        neg_half_x = self._neg_half(x)
+
+        x_rope = (x * self.cos_cached[:x.shape[0]]) + (
+                    neg_half_x * self.sin_cached[:x.shape[0]])  # [x_1*cosTHETA_1 - x_d/2*sinTHETA_d/2, ....]
+
+        return x_rope
 
 
 def modulate(x, shift, scale):
@@ -23,6 +72,20 @@ def modulate(x, shift, scale):
 #################################################################################
 #               Embedding Layers for Timesteps and Class Labels                 #
 #################################################################################
+
+# 定义MLP模型
+class XEmbedder(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        print(input_size,hidden_size,"##$#$#$#$")
+        super(XEmbedder, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)  # 输入层到隐藏层的全连接
+        self.fc2 = nn.Linear(hidden_size, output_size)  # 隐藏层到输出层的全连接
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))  # 隐藏层使用ReLU激活函数
+        x = self.fc2(x)  # 输出层不使用激活函数（根据任务不同可以添加softmax/sigmoid等）
+        return x
+
 
 class TimestepEmbedder(nn.Module):
     """
@@ -98,6 +161,8 @@ class LabelEmbedder(nn.Module):
 #                                 Core DiT Model                                #
 #################################################################################
 
+
+
 class DiTBlock(nn.Module):
     """
     A DiT block with adaptive layer norm zero (adaLN-Zero) conditioning.
@@ -157,6 +222,7 @@ class DiT(nn.Module):
         mlp_ratio=4.0,
         class_dropout_prob=0.1,
         num_classes=1000,
+        x_size=16,
         learn_sigma=False,
     ):
         super().__init__()
@@ -165,14 +231,16 @@ class DiT(nn.Module):
         self.out_channels = in_channels * 2 if learn_sigma else in_channels
         self.patch_size = patch_size
         self.num_heads = num_heads
+        self.hidden_size = hidden_size
         self.condition_dropout = 0.1
-
-        self.x_embedder = PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)
+        print("hidden",hidden_size,input_size)
+        self.x_embedder = XEmbedder(x_size, hidden_size, hidden_size)#PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)#TODO：
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
-        num_patches = self.x_embedder.num_patches
-        # Will use fixed sin-cos embedding:
-        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
+        # num_patches = self.x_embedder.num_patches
+        # # Will use fixed sin-cos embedding:
+
+        self.x_pos_embeder = RotaryPositionalEmbeddings(d=hidden_size)
 
         self.blocks = nn.ModuleList([
             DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(depth)
@@ -199,13 +267,12 @@ class DiT(nn.Module):
         self.apply(_basic_init)
 
         # Initialize (and freeze) pos_embed by sin-cos embedding:
-        pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.x_embedder.num_patches))
-        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+        # self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
         # Initialize patch_embed like nn.Linear (instead of nn.Conv2d):
-        w = self.x_embedder.proj.weight.data
-        nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
-        nn.init.constant_(self.x_embedder.proj.bias, 0)
+        # w = self.x_embedder.proj.weight.data
+        # nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
+        # nn.init.constant_(self.x_embedder.proj.bias, 0)
 
         # Initialize label embedding table:
         nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
@@ -237,8 +304,11 @@ class DiT(nn.Module):
         assert h * w == x.shape[1]
 
         x = x.reshape(shape=(x.shape[0], h, w, 1, p, c))
+        print(x.shape)
         x = torch.einsum('nhwpqc->nchpwq', x)
+        print(x.shape)
         imgs = x.reshape(shape=(x.shape[0], c, h * 1, w * p))
+        print(x.shape)
         return imgs
 
     def forward(self, x, y, t, returns: torch.Tensor = torch.ones(1, 1), use_dropout: bool = True,
@@ -252,14 +322,19 @@ class DiT(nn.Module):
 
         # now x: (N, W, C) C is the dim of the state, W is the horizon of the state
         # change to (N, C, 1, W)
-        x = x.permute(0, 2, 1)
-        x = x.unsqueeze(2)
+        # print("x.shape1",x.shape)
+        # x = x.permute(0, 2, 1)
+        # x = x.unsqueeze(2)
         # TODO change y to budget requirement
         y = torch.ones_like(t, dtype=torch.int)
-
-        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
+        # print("self.pos_embed",self.pos_embed.shape)
+        print("x.shape2",x.shape)
+        x = self.x_pos_embeder(self.x_embedder(x).permute(1,0,2)[:,:,None,:]).squeeze(2).permute(1,0,2)  # (N, T, D), where T = H * W / patch_size ** 2
+        print("x.shape3",x.shape)
         t = self.t_embedder(t)                   # (N, D)
+        print("t.shape",t.shape)
         y = self.y_embedder(y, self.training)    # (N, D)
+        print("y.shape",y.shape)
 
         returns_embed = self.returns_mlp(returns)
         if use_dropout:
@@ -274,10 +349,12 @@ class DiT(nn.Module):
         c = t + y + returns_embed                # (N, D)
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
+        print("x5",x.shape)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
-        x = self.unpatchify(x)                   # (N, out_channels, H, W)
-        x = x.squeeze(2)  # change to N C W
-        x = x.permute(0, 2, 1)  # change to N W C
+        print("x6",x.shape)
+        # x = self.unpatchify(x)                   # (N, out_channels, H, W)
+        # x = x.squeeze(2)  # change to N C W
+        # x = x.permute(0, 2, 1)  # change to N W C
         return x
 
     def forward_with_cfg(self, x, t, y, cfg_scale):

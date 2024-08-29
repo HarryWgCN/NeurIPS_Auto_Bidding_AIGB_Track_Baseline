@@ -11,7 +11,7 @@ class aigb_dataset(Dataset):
         super().__init__()
         # TODO change to full set
         states, actions, rewards, terminals = load_local_data_nips(
-            train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data.csv")
+            train_data_path="./data/trajectory/trajectory_data_truncated.csv")
         # states, actions, rewards, terminals = load_local_data_nips(
         #     train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data_truncated.csv")
 
@@ -74,8 +74,9 @@ def load_local_data(data_version):
 
 
 def load_local_data_nips(train_data_path="/home/disk2/auto-bidding/data/traffic/training_data_rlData_folder/training_data_all-rlData.csv"):
+    print("training_data1",train_data_path)
     training_data = pd.read_csv(train_data_path)
-
+    print("training_data",train_data_path)
     def safe_literal_eval(val):
         if pd.isna(val):
             return val  # 如果是NaN，返回NaN
