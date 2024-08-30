@@ -65,6 +65,20 @@ class RotaryPositionalEmbeddings(nn.Module):
         return x_rope
 
 
+class SinusoidalPosEmb(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, x):
+        device = x.device
+        half_dim = self.dim // 2
+        emb = math.log(10000) / (half_dim - 1)
+        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
+        emb = x[:, None] * emb[None, :]
+        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
+        return emb
+
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
@@ -76,7 +90,6 @@ def modulate(x, shift, scale):
 # 定义MLP模型
 class XEmbedder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
-        print(input_size,hidden_size,"##$#$#$#$")
         super(XEmbedder, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)  # 输入层到隐藏层的全连接
         self.fc2 = nn.Linear(hidden_size, output_size)  # 隐藏层到输出层的全连接
@@ -233,7 +246,6 @@ class DiT(nn.Module):
         self.num_heads = num_heads
         self.hidden_size = hidden_size
         self.condition_dropout = 0.1
-        print("hidden",hidden_size,input_size)
         self.x_embedder = XEmbedder(x_size, hidden_size, hidden_size)#PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)#TODO：
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
@@ -304,11 +316,8 @@ class DiT(nn.Module):
         assert h * w == x.shape[1]
 
         x = x.reshape(shape=(x.shape[0], h, w, 1, p, c))
-        print(x.shape)
         x = torch.einsum('nhwpqc->nchpwq', x)
-        print(x.shape)
         imgs = x.reshape(shape=(x.shape[0], c, h * 1, w * p))
-        print(x.shape)
         return imgs
 
     def forward(self, x, y, t, returns: torch.Tensor = torch.ones(1, 1), use_dropout: bool = True,
@@ -327,14 +336,9 @@ class DiT(nn.Module):
         # x = x.unsqueeze(2)
         # TODO change y to budget requirement
         y = torch.ones_like(t, dtype=torch.int)
-        # print("self.pos_embed",self.pos_embed.shape)
-        print("x.shape2",x.shape)
         x = self.x_pos_embeder(self.x_embedder(x).permute(1,0,2)[:,:,None,:]).squeeze(2).permute(1,0,2)  # (N, T, D), where T = H * W / patch_size ** 2
-        print("x.shape3",x.shape)
         t = self.t_embedder(t)                   # (N, D)
-        print("t.shape",t.shape)
         y = self.y_embedder(y, self.training)    # (N, D)
-        print("y.shape",y.shape)
 
         returns_embed = self.returns_mlp(returns)
         if use_dropout:
@@ -349,9 +353,7 @@ class DiT(nn.Module):
         c = t + y + returns_embed                # (N, D)
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        print("x5",x.shape)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
-        print("x6",x.shape)
         # x = self.unpatchify(x)                   # (N, out_channels, H, W)
         # x = x.squeeze(2)  # change to N C W
         # x = x.permute(0, 2, 1)  # change to N W C

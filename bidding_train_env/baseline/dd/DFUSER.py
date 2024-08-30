@@ -379,7 +379,6 @@ class GaussianInvDynDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def p_mean_variance(self, x, cond, t, returns: torch.Tensor = torch.ones(1, 1)):
-        print("111")
         if self.returns_condition:
             # epsilon could be epsilon or x0 itself
 
@@ -455,7 +454,6 @@ class GaussianInvDynDiffusion(nn.Module):
         noise = torch.randn_like(x_start, device=x_start.device)
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         t = t.to(x_noisy.device)
-        print("222")
         x_recon = self.model(x_noisy, cond, t, returns)
 
         if self.predict_epsilon:
@@ -564,7 +562,6 @@ class DFUSER(nn.Module):
             actions = actions.cuda()
             returns = returns.cuda()
             masks = masks.cuda()
-        print("333")
         x = torch.cat([actions, states], dim=-1)
         cond = torch.ones_like(states[:, 0], device=states.device)[:, None, :]
         loss, infos, (diffuse_loss, inv_loss) = self.diffuser.loss(x, cond, returns=returns, masks=masks)
