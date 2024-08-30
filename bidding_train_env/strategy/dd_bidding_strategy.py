@@ -11,12 +11,12 @@ class DdBiddingStrategy(BaseBiddingStrategy):
     Decision-Diffuser-PlayerStrategy
     """
 
-    def __init__(self, budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
+    def __init__(self, i,budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
         file_name = os.path.dirname(os.path.realpath(__file__))
         dir_name = os.path.dirname(file_name)
         dir_name = os.path.dirname(dir_name)
-        model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser10.pt")
+        model_path = os.path.join(dir_name, "saved_model", "DDtest", f"diffuser_{i}.pt")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)

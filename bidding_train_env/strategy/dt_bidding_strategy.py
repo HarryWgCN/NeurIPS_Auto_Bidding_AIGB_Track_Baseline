@@ -15,7 +15,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
     Decision-Transformer-PlayerStrategy
     """
 
-    def __init__(self, budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1):
+    def __init__(self, i,budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
 
         file_name = os.path.dirname(os.path.realpath(__file__))
@@ -31,7 +31,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         self.model.load_net(model_path)
 
     def reset(self):
-        self.remaining_budget = self.budget
+        self.remaining_budget = self.budget#预算
 
     def bidding(self, timeStepIndex, pValues, pValueSigmas, historyPValueInfo, historyBid,
                 historyAuctionResult, historyImpressionResult, historyLeastWinningCost):
@@ -53,9 +53,9 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         """
         time_left = (48 - timeStepIndex) / 48
         budget_left = self.remaining_budget / self.budget if self.budget > 0 else 0
-        history_xi = [result[:, 0] for result in historyAuctionResult]
+        history_xi = [result[:, 0] for result in historyAuctionResult] #获胜状态、广告坑位、支付费用
         history_pValue = [result[:, 0] for result in historyPValueInfo]
-        history_conversion = [result[:, 1] for result in historyImpressionResult]
+        history_conversion = [result[:, 1] for result in historyImpressionResult] #历史展现结果：曝光和转化
 
         historical_xi_mean = np.mean([np.mean(xi) for xi in history_xi]) if history_xi else 0
 
@@ -68,7 +68,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         historical_pValues_mean = np.mean([np.mean(value) for value in history_pValue]) if history_pValue else 0
 
         historical_bid_mean = np.mean([np.mean(bid) for bid in historyBid]) if historyBid else 0
-
+        #计算历史数据中最后 n 个元素的均值
         def mean_of_last_n_elements(history, n):
             last_three_data = history[max(0, n - 3):n]
             if len(last_three_data) == 0:
@@ -82,10 +82,10 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         last_three_pValues_mean = mean_of_last_n_elements(history_pValue, 3)
         last_three_bid_mean = mean_of_last_n_elements(historyBid, 3)
 
-        current_pValues_mean = np.mean(pValues)
-        current_pv_num = len(pValues)
+        current_pValues_mean = np.mean(pValues) #转化概率的均值
+        current_pv_num = len(pValues) #转化概率的数量
 
-        historical_pv_num_total = sum(len(bids) for bids in historyBid) if historyBid else 0
+        historical_pv_num_total = sum(len(bids) for bids in historyBid) if historyBid else 0 #总出价次数
         last_three_ticks = slice(max(0, timeStepIndex - 3), timeStepIndex)
         last_three_pv_num_total = sum(
             [len(historyBid[i]) for i in range(max(0, timeStepIndex - 3), timeStepIndex)]) if historyBid else 0

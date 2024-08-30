@@ -11,6 +11,7 @@ class OfflineEnv:
         Initialize the simulation environment.
         :param min_remaining_budget: The minimum remaining budget allowed for bidding advertiser.
         """
+        #用于设置允许竞价广告商保留的最低剩余预算。
         self.min_remaining_budget = min_remaining_budget
 
     def simulate_ad_bidding(self, pValues: np.ndarray,pValueSigmas: np.ndarray, bids: np.ndarray, leastWinningCosts: np.ndarray):
@@ -24,12 +25,13 @@ class OfflineEnv:
         :return: Win values, costs spent, and winning status for each bid.
 
         """
-        tick_status = bids >= leastWinningCosts
-        tick_cost = leastWinningCosts * tick_status
-        values = np.random.normal(loc=pValues, scale=pValueSigmas)
+        #接受四个变量：表示广告曝光给用户时的转化概率、无效变量、表示出价、表示赢得当前展现机会的最低费用，即当前的竞价队列中的第4高的出价
+        tick_status = bids >= leastWinningCosts #确定是否赢得展现机会
+        tick_cost = leastWinningCosts * tick_status #赢得的最低成本
+        values = np.random.normal(loc=pValues, scale=pValueSigmas) #以pValues为均值、以0为标准差的正态分布中生成一个随机值
         values = values*tick_status
-        tick_value = np.clip(values,0,1)
-        tick_conversion = np.random.binomial(n=1, p=tick_value)
+        tick_value = np.clip(values,0,1) #将values限制在0-1之间,将数组中小于 0 的元素设为 0，大于 1 的元素设为 1
+        tick_conversion = np.random.binomial(n=1, p=tick_value) #生成一个符合二项分布的随机数、n表示实验次数、p表示成功概率
 
         return tick_value, tick_cost, tick_status,tick_conversion
 
