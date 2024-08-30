@@ -16,7 +16,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         file_name = os.path.dirname(os.path.realpath(__file__))
         dir_name = os.path.dirname(file_name)
         dir_name = os.path.dirname(dir_name)
-        model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser1.pt")
+        model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser10.pt")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)
@@ -101,4 +101,5 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         alpha = alpha.item()
         alpha = max(0, alpha)
         bids = alpha * pValues
+        
         return bids
