@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from einops.layers.torch import Rearrange
 from bidding_train_env.baseline.dit.diffusion_transformer import DiT_S_8
 
-
+# 生成正弦位置编码
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -23,7 +23,7 @@ class SinusoidalPosEmb(nn.Module):
         emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
         return emb
 
-
+# 卷积下采样
 class Downsample1d(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -32,7 +32,7 @@ class Downsample1d(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-
+# 卷积上采样
 class Upsample1d(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -41,7 +41,7 @@ class Upsample1d(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-
+#卷积块
 class Conv1dBlock(nn.Module):
 
     def __init__(self, inp_channels, out_channels, kernel_size, mish=True, n_groups=8):
@@ -54,8 +54,8 @@ class Conv1dBlock(nn.Module):
 
         self.block = nn.Sequential(
             nn.Conv1d(inp_channels, out_channels, kernel_size, padding=kernel_size // 2),
-            Rearrange('batch channels horizon -> batch channels 1 horizon'),
-            nn.GroupNorm(n_groups, out_channels),
+            Rearrange('batch channels horizon -> batch channels 1 horizon'),#调整张量维度
+            nn.GroupNorm(n_groups, out_channels),#组归一化
             Rearrange('batch channels 1 horizon -> batch channels horizon'),
             act_fn,
         )
@@ -69,7 +69,7 @@ def extract(a, t, x_shape: list):
     out = a.gather(-1, t)
     return out.reshape(b, 1, 1)
 
-
+#生成一组按余弦函数调度计算得到的一组系数
 def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
     steps = timesteps + 1
     x = np.linspace(0, steps, steps)
@@ -110,7 +110,7 @@ Losses = {
     'state_l2': WeightedStateL2,
 }
 
-
+#调用卷积块进行处理
 class ResidualTemporalBlock(nn.Module):
 
     def __init__(self, inp_channels, out_channels, embed_dim, horizon, kernel_size=5, mish=True):
@@ -131,7 +131,7 @@ class ResidualTemporalBlock(nn.Module):
             nn.Linear(embed_dim, out_channels),
             Rearrange('batch t -> batch t 1'),
         )
-
+        # 卷积操作/恒等映射（不做任何处理）
         self.residual_conv = nn.Conv1d(inp_channels, out_channels, 1) \
             if inp_channels != out_channels else nn.Identity()
 
@@ -146,21 +146,23 @@ class TemporalUnet(nn.Module):
 
     def __init__(
             self,
-            horizon,
-            transition_dim,
-            cond_dim,
+            horizon, # 48
+            transition_dim, # 16
+            cond_dim, # 1
             dim=128,
             dim_mults=(1, 2, 4),
             returns_condition=True,
-            condition_dropout=0.1,
+            condition_dropout=0.1, # 0.25
             calc_energy=False,
             kernel_size=5,
     ):
         super().__init__()
-
+        # [16, 128, 256, 512]
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
+        # [(16, 128), (128, 256), (256, 512)]
         in_out = list(zip(dims[:-1], dims[1:]))
 
+        #激活函数
         if calc_energy:
             mish = False
             act_fn = nn.SiLU()
@@ -168,19 +170,19 @@ class TemporalUnet(nn.Module):
             mish = True
             act_fn = nn.Mish()
 
-        self.time_dim = dim
-        self.returns_dim = dim
+        self.time_dim = dim # 128
+        self.returns_dim = dim # 128
 
         self.time_mlp = nn.Sequential(
-            SinusoidalPosEmb(dim),
+            SinusoidalPosEmb(dim), # 添加正弦位置编码的模块，其作用是为输入添加位置信息
             nn.Linear(dim, dim * 4),
             act_fn,
             nn.Linear(dim * 4, dim),
         )
 
-        self.returns_condition = returns_condition
-        self.condition_dropout = condition_dropout
-        self.calc_energy = calc_energy
+        self.returns_condition = returns_condition # true
+        self.condition_dropout = condition_dropout # 0.25
+        self.calc_energy = calc_energy #false
 
         self.returns_mlp = nn.Sequential(
             nn.Linear(1, dim),
@@ -190,14 +192,15 @@ class TemporalUnet(nn.Module):
             nn.Linear(dim * 4, dim),
         )
 
-        embed_dim = 2 * dim
+        embed_dim = 2 * dim # 256
         self.downs = nn.ModuleList([])
         self.ups = nn.ModuleList([])
-        num_resolutions = len(in_out)
+        num_resolutions = len(in_out)# 3
         for ind, (dim_in, dim_out) in enumerate(in_out):
-            is_last = ind >= (num_resolutions - 1)
+            is_last = ind >= (num_resolutions - 1)#是否是最后一个
 
             self.downs.append(nn.ModuleList([
+                #16 128 256 48 5 false/true
                 ResidualTemporalBlock(dim_in, dim_out, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size,
                                       mish=mish),
                 ResidualTemporalBlock(dim_out, dim_out, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size,
@@ -213,8 +216,8 @@ class TemporalUnet(nn.Module):
                                                 kernel_size=kernel_size, mish=mish)
         self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=embed_dim, horizon=horizon,
                                                 kernel_size=kernel_size, mish=mish)
-
-        for ind, (dim_in, dim_out) in enumerate(reversed(in_out[1:])):
+        #[(256, 512), (128, 256)]
+        for ind, (dim_in, dim_out) in enumerate(reversed(in_out[1:])):#逆序
             is_last = ind >= (num_resolutions - 1)
 
             self.ups.append(nn.ModuleList([
@@ -292,10 +295,10 @@ class GaussianInvDynDiffusion(nn.Module):
                  condition_guidance_w=0.1):
         super().__init__()
 
-        self.horizon = horizon
-        self.observation_dim = observation_dim
-        self.action_dim = action_dim
-        self.transition_dim = observation_dim + action_dim
+        self.horizon = horizon # 48
+        self.observation_dim = observation_dim # 16
+        self.action_dim = action_dim # 1
+        self.transition_dim = observation_dim + action_dim # 17
         self.model = model
         self.inv_model = nn.Sequential(
             nn.Linear(4 * self.observation_dim, hidden_dim),
@@ -306,18 +309,18 @@ class GaussianInvDynDiffusion(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, self.action_dim),
         )
-        self.returns_condition = returns_condition
-        self.condition_guidance_w = condition_guidance_w
-
+        self.returns_condition = returns_condition #false
+        self.condition_guidance_w = condition_guidance_w #0.1
+ 
         betas = cosine_beta_schedule(n_timesteps)
         alphas = 1. - betas
-        alphas_cumprod = torch.cumprod(alphas, axis=0)
-        alphas_cumprod_prev = torch.cat([torch.ones(1), alphas_cumprod[:-1]])
+        alphas_cumprod = torch.cumprod(alphas, axis=0) #按照指定轴（axis=0）计算 alphas 的累积乘积
+        alphas_cumprod_prev = torch.cat([torch.ones(1), alphas_cumprod[:-1]]) # 1 + 除最后一个元素
 
-        self.n_timesteps = int(n_timesteps)
-        self.clip_denoised = clip_denoised
-        self.predict_epsilon = predict_epsilon
-
+        self.n_timesteps = int(n_timesteps)#1000
+        self.clip_denoised = clip_denoised#false
+        self.predict_epsilon = predict_epsilon#true
+        # 缓冲区在模型的参数中不被训练
         self.register_buffer('betas', betas)
         self.register_buffer('alphas_cumprod', alphas_cumprod)
         self.register_buffer('alphas_cumprod_prev', alphas_cumprod_prev)
@@ -340,7 +343,7 @@ class GaussianInvDynDiffusion(nn.Module):
         self.register_buffer('posterior_mean_coef2',
                              (1. - alphas_cumprod_prev) * np.sqrt(alphas) / (1. - alphas_cumprod))
 
-        loss_weights = self.get_loss_weights(loss_discount)
+        loss_weights = self.get_loss_weights(loss_discount) # 1.0
         self.loss_fn = Losses['state_l2'](loss_weights)
 
     def get_loss_weights(self, discount):
@@ -606,7 +609,7 @@ class DFUSER(nn.Module):
     def save_net(self, save_dir, epi):
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
-        torch.save(self.diffuser.state_dict(), f'{save_dir}/diffuser{epi}.pt')
+        torch.save(self.diffuser.state_dict(), f'{save_dir}/diffuser_{epi}.pt')
 
     def save_model(self, save_path, epi):
         if not os.path.isdir(save_path):

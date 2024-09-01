@@ -30,6 +30,10 @@ def train_model():
                                 state_std=replay_buffer.state_std)
     step_num = 10000
     batch_size = 32
+    # 加权随机采样器:
+    # 用于加权采样的概率分布。这些概率值决定了每个样本被抽取的概率。
+    # 采样的样本数量，通常是步数（step_num）乘以批量大小（batch_size）。
+    # 采样时是否允许有放回地抽取样本。如果设置为True，则允许同一个样本在一个batch中被多次抽取。
     sampler = WeightedRandomSampler(replay_buffer.p_sample, num_samples=step_num * batch_size, replacement=True)
     dataloader = DataLoader(replay_buffer, sampler=sampler, batch_size=batch_size)
 
@@ -39,7 +43,7 @@ def train_model():
         train_loss = model.step(states, actions, rewards, dones, rtg, timesteps, attention_mask)
         i += 1
         logger.info(f"Step: {i} Action loss: {np.mean(train_loss)}")
-        model.scheduler.step()
+        model.scheduler.step() #更新优化器的学习率等参数
 
     model.save_net("saved_model/DTtest")
     test_state = np.ones(state_dim, dtype=np.float32)

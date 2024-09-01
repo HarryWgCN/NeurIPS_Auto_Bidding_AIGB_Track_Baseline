@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 
 def run_decision_diffuser(
-        save_dir="/home/wanghaorui-22/projects/auto-bidding/saved_model/DDtest",
+        save_dir="saved_model/DDtest",
         train_epoch=1,
         batch_size=1000):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -41,12 +41,16 @@ def run_decision_diffuser(
             diffuse_loss = diffuse_loss.detach().clone()
             inv_loss = inv_loss.detach().clone()
             end_time = time.time()
-        print(
-            f"Epoch {epoch} 第{batch_index}个batch训练时间为: {end_time - start_time} s, all_loss: {all_loss}, diffuse_loss: {diffuse_loss}, inv_loss: {inv_loss}")
+            print(
+                f"Epoch {epoch} 第{batch_index}个batch训练时间为: {end_time - start_time} s, all_loss: {all_loss}, diffuse_loss: {diffuse_loss}, inv_loss: {inv_loss}")
+        # 保存每轮结果
+        print('---------------------------------------------------')
+        algorithm.save_net(save_dir, epoch)
+        print(f'第 {epoch} 轮 model saved to {save_dir}')
 
     # algorithm.save_model(save_path, epi)
-    algorithm.save_net(save_dir, train_epoch)
-    print(f'Model saved to {save_dir}')
+    # algorithm.save_net(save_dir, train_epoch)
+    # print(f'Model saved to {save_dir}')
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import os
 import math
 
-
+#自注意力
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -12,7 +12,7 @@ class CausalSelfAttention(nn.Module):
         self.key = nn.Linear(config['n_embd'], config['n_embd'])
         self.query = nn.Linear(config['n_embd'], config['n_embd'])
         self.value = nn.Linear(config['n_embd'], config['n_embd'])
-
+        #注意力权重和残差
         self.attn_drop = nn.Dropout(config['attn_pdrop'])
         self.resid_drop = nn.Dropout(config['resid_pdrop'])
 
@@ -25,7 +25,7 @@ class CausalSelfAttention(nn.Module):
         self.n_head = config['n_head']
 
     def forward(self, x, mask):
-        B, T, C = x.size()
+        B, T, C = x.size()# 获取 batch size (B)、序列长度 (T) 和特征维度 (C)
 
         k = self.key(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
         q = self.query(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
@@ -45,10 +45,11 @@ class CausalSelfAttention(nn.Module):
         y = self.resid_drop(self.proj(y))
         return y
 
-
+#块结构
 class Block(nn.Module):
     def __init__(self, config):
         super().__init__()
+        #归一化
         self.ln1 = nn.LayerNorm(config['n_embd'])
         self.ln2 = nn.LayerNorm(config['n_embd'])
         self.attn = CausalSelfAttention(config)
@@ -64,7 +65,10 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln2(x))
         return x
 
-
+#训练阶段
+#调用step, step调用forward
+#测试阶段
+#调用take acticon, take action调用get action，get action调用forward
 class DecisionTransformer(nn.Module):
 
     def __init__(self, state_dim, act_dim, state_mean, state_std, action_tanh=False, K=10, max_ep_len=96, scale=2000,
@@ -74,16 +78,16 @@ class DecisionTransformer(nn.Module):
 
         self.length_times = 3
         self.hidden_size = 64
-        self.state_mean = state_mean
-        self.state_std = state_std
+        self.state_mean = state_mean #状态均值
+        self.state_std = state_std #状态标准差
         # assert self.hidden_size == config['n_embd']
-        self.max_length = K
-        self.max_ep_len = max_ep_len
+        self.max_length = K  #10
+        self.max_ep_len = max_ep_len  #96
 
-        self.state_dim = state_dim
-        self.act_dim = act_dim
-        self.scale = scale
-        self.target_return = target_return
+        self.state_dim = state_dim #16
+        self.act_dim = act_dim #1
+        self.scale = scale #2000
+        self.target_return = target_return #4
 
         self.warmup_steps = 10000
         self.weight_decay = 0.0001
@@ -100,27 +104,27 @@ class DecisionTransformer(nn.Module):
             "resid_pdrop": 0.1,
             "attn_pdrop": 0.1
         }
-
+        #构造transformer：3个块结构
         self.transformer = nn.ModuleList([Block(block_config) for _ in range(block_config['n_layer'])])
 
-        self.embed_timestep = nn.Embedding(self.max_ep_len, self.hidden_size)
-        self.embed_return = torch.nn.Linear(1, self.hidden_size)
+        self.embed_timestep = nn.Embedding(self.max_ep_len, self.hidden_size) #96 64
+        self.embed_return = torch.nn.Linear(1, self.hidden_size) #64
         self.embed_reward = torch.nn.Linear(1, self.hidden_size)
-        self.embed_state = torch.nn.Linear(self.state_dim, self.hidden_size)
-        self.embed_action = torch.nn.Linear(self.act_dim, self.hidden_size)
+        self.embed_state = torch.nn.Linear(self.state_dim, self.hidden_size)#16 64
+        self.embed_action = torch.nn.Linear(self.act_dim, self.hidden_size)#1 64
 
-        self.embed_ln = nn.LayerNorm(self.hidden_size)
-        self.predict_state = torch.nn.Linear(self.hidden_size, self.state_dim)
+        self.embed_ln = nn.LayerNorm(self.hidden_size) #64
+        self.predict_state = torch.nn.Linear(self.hidden_size, self.state_dim) #64 16
         self.predict_action = nn.Sequential(
             *([nn.Linear(self.hidden_size, self.act_dim)] + ([nn.Tanh()] if action_tanh else []))
-        )
+        ) #64 1 初始化action_tanh为False
 
         self.predict_return = torch.nn.Linear(self.hidden_size, 1)
 
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,
                                                            lambda steps: min((steps + 1) / self.warmup_steps, 1))
-
+        # lambda 函数的作用是在初始阶段逐渐增加学习率，并在达到一定步数后保持不变
         self.init_eval()
 
     def forward(self, states, actions, rewards, returns_to_go, timesteps, attention_mask=None):
@@ -129,18 +133,18 @@ class DecisionTransformer(nn.Module):
 
         if attention_mask is None:
             attention_mask = torch.ones((batch_size, seq_length), dtype=torch.long)
-
+        #调整为64维度
         state_embeddings = self.embed_state(states)
         action_embeddings = self.embed_action(actions)
         returns_embeddings = self.embed_return(returns_to_go)
         rewards_embeddings = self.embed_reward(rewards)
         time_embeddings = self.embed_timestep(timesteps)
-
+        #输入张量的堆叠和变换
         state_embeddings = state_embeddings + time_embeddings
         action_embeddings = action_embeddings + time_embeddings
         returns_embeddings = returns_embeddings + time_embeddings
         rewards_embeddings = rewards_embeddings + time_embeddings
-
+        #注意力掩码的堆叠和变换
         stacked_inputs = torch.stack(
             (returns_embeddings, state_embeddings, action_embeddings), dim=1
         ).permute(0, 2, 1, 3).reshape(batch_size, 3 * seq_length, self.hidden_size)
@@ -156,7 +160,7 @@ class DecisionTransformer(nn.Module):
 
         x = x.reshape(batch_size, seq_length, self.length_times, self.hidden_size).permute(0, 2, 1, 3)
 
-        return_preds = self.predict_return(x[:, 2])
+        return_preds = self.predict_return(x[:, 2]) #选择了输入张量 x 中的第三列数据
         state_preds = self.predict_state(x[:, 2])
         action_preds = self.predict_action(x[:, 1])
         return state_preds, action_preds, return_preds, None
@@ -211,8 +215,8 @@ class DecisionTransformer(nn.Module):
 
         state_preds, action_preds, return_preds, reward_preds = self.forward(
             states, actions, rewards, rtg[:, :-1], timesteps, attention_mask=attention_mask,
-        )
-
+        )#获取 rtg 张量的所有行和除了最后一列之外的所有列。返回的reward_preds为None
+        #过滤动作张量
         act_dim = action_preds.shape[2]
         action_preds = action_preds.reshape(-1, act_dim)[attention_mask.reshape(-1) > 0]
         action_target = action_target.reshape(-1, act_dim)[attention_mask.reshape(-1) > 0]
@@ -232,7 +236,7 @@ class DecisionTransformer(nn.Module):
             self.eval_states = torch.from_numpy(state).reshape(1, self.state_dim)
             ep_return = target_return if target_return is not None else self.target_return
             self.eval_target_return = torch.tensor(ep_return, dtype=torch.float32).reshape(1, 1)
-        else:
+        else:#似乎始终不执行
             assert pre_reward is not None
             cur_state = torch.from_numpy(state).reshape(1, self.state_dim)
             self.eval_states = torch.cat([self.eval_states, cur_state], dim=0)
