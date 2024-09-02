@@ -10,14 +10,15 @@ class aigb_dataset(Dataset):
     def __init__(self, step_len, **kwargs) -> None:
         super().__init__()
         # 用单个轨迹数据进行训练
-        states, actions, rewards, terminals = load_local_data_nips(
-            train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data.csv")
+        states, actions, cpa, rewards, terminals = load_local_data_nips(
+            train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data_truncated.csv")
         # 用所有的轨迹数据进行训练
         # states, actions, rewards, terminals = load_local_data_nips_com(
         #     data_paths=["/home/disk2/auto-bidding/data/trajectory/trajectory_data.csv","/home/disk2/auto-bidding/data/trajectory/trajectory_data_extended_1.csv",
         #                      "/home/disk2/auto-bidding/data/trajectory/trajectory_data_extended_2.csv"])
         self.states = states
         self.actions = actions
+        self.cpa = cpa
         self.rewards = rewards
         self.terminals = terminals
         self.step_len = step_len
@@ -43,12 +44,15 @@ class aigb_dataset(Dataset):
                               dtype=torch.float32)
         reward = torch.tensor(self.rewards[self.candidate_pos[index]:self.candidate_pos[index + 1], :],
                               dtype=torch.float32)
+        cpa = torch.tensor(self.cpa[self.candidate_pos[index]:self.candidate_pos[index + 1], :],
+                              dtype=torch.float32)
         # action = action - 1
         # 当前序列的长度
         len_state = len(state)
         # 进行padding，填充数据
         state = torch.nn.functional.pad(state, (0, 0, 0, self.step_len - len(state)), "constant", 0)
         action = torch.nn.functional.pad(action, (0, 0, 0, self.step_len - len(action)), "constant", 0)
+        cpa = torch.nn.functional.pad(cpa, (0, 0, 0, self.step_len - len(cpa)), "constant", 0)
         # 计算returns
         returns = reward.sum().sigmoid() # 求和并压缩到0-1之间
         returns = torch.clamp(returns, max=1.0).reshape(1) # 限制在0-1之间
@@ -57,7 +61,7 @@ class aigb_dataset(Dataset):
         masks[:len_state] = 1 # 前 len_state 个位置设置为 1，表示有效的状态位置
         masks = masks.bool()
         # 返回
-        return state, action, returns, masks
+        return state, action, cpa, returns, masks
 
 
 # 加载本地数据
@@ -93,8 +97,9 @@ def load_local_data_nips(train_data_path="/home/disk2/auto-bidding/data/traffic/
     states = np.array(training_data['state'].tolist())
     actions = training_data["action"].to_numpy().reshape(-1, 1)
     rewards = training_data["reward"].to_numpy().reshape(-1, 1)
+    CPAConstraints = training_data["CPAConstraint"].to_numpy().reshape(-1, 1)
     terminals = training_data["terminal"].to_numpy().reshape(-1, 1)
-    return states, actions, rewards, terminals
+    return states, actions, CPAConstraints, rewards, terminals
 
 def load_local_data_nips_com(data_paths):
     all_data = []

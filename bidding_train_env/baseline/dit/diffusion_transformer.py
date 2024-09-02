@@ -169,6 +169,20 @@ class LabelEmbedder(nn.Module):
         embeddings = self.embedding_table(labels)
         return embeddings
 
+class ScalarEmbedder(nn.Module):
+    """
+    Embeds class labels into vector representations. Also handles label dropout for classifier-free guidance.
+    """
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.embedder = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(1, hidden_size, bias=True)
+        )
+
+    def forward(self, cpa):
+        return self.embedder(cpa)
+
 
 #################################################################################
 #                                 Core DiT Model                                #
@@ -246,9 +260,10 @@ class DiT(nn.Module):
         self.num_heads = num_heads
         self.hidden_size = hidden_size
         self.condition_dropout = 0.1
-        self.x_embedder = XEmbedder(x_size, hidden_size, hidden_size)#PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)#TODO：
+        self.x_embedder = XEmbedder(x_size, hidden_size, hidden_size)
         self.t_embedder = TimestepEmbedder(hidden_size)
-        self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
+        # self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
+        self.y_embedder = ScalarEmbedder(hidden_size)
         # num_patches = self.x_embedder.num_patches
         # # Will use fixed sin-cos embedding:
 
@@ -287,7 +302,7 @@ class DiT(nn.Module):
         # nn.init.constant_(self.x_embedder.proj.bias, 0)
 
         # Initialize label embedding table:
-        nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
+        nn.init.normal_(self.y_embedder.embedder[1].weight, std=0.02)
 
         # Initialize timestep embedding MLP:
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
@@ -320,7 +335,7 @@ class DiT(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * 1, w * p))
         return imgs
 
-    def forward(self, x, y, t, returns: torch.Tensor = torch.ones(1, 1), use_dropout: bool = True,
+    def forward(self, x, cond, t, y, returns: torch.Tensor = torch.ones(1, 1), use_dropout: bool = True,
                 force_dropout: bool = False):
         """
         Forward pass of DiT.
@@ -329,16 +344,10 @@ class DiT(nn.Module):
         y: (N,) tensor of class labels
         """
 
-        # now x: (N, W, C) C is the dim of the state, W is the horizon of the state
-        # change to (N, C, 1, W)
-        # print("x.shape1",x.shape)
-        # x = x.permute(0, 2, 1)
-        # x = x.unsqueeze(2)
-        # TODO change y to budget requirement
-        y = torch.ones_like(t, dtype=torch.int)
+
         x = self.x_pos_embeder(self.x_embedder(x).permute(1,0,2)[:,:,None,:]).squeeze(2).permute(1,0,2)  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
-        y = self.y_embedder(y, self.training)    # (N, D)
+        y = self.y_embedder(y[:, 0, :])    # (N, D)
 
         returns_embed = self.returns_mlp(returns)
         if use_dropout:

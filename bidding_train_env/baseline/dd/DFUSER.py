@@ -311,7 +311,7 @@ class GaussianInvDynDiffusion(nn.Module):
         )
         self.returns_condition = returns_condition #false
         self.condition_guidance_w = condition_guidance_w #0.1
- 
+
         betas = cosine_beta_schedule(n_timesteps)
         alphas = 1. - betas
         alphas_cumprod = torch.cumprod(alphas, axis=0) #按照指定轴（axis=0）计算 alphas 的累积乘积
@@ -381,15 +381,15 @@ class GaussianInvDynDiffusion(nn.Module):
         posterior_log_variance_clipped = extract(self.posterior_log_variance_clipped, t, x_t.shape)
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
-    def p_mean_variance(self, x, cond, t, returns: torch.Tensor = torch.ones(1, 1)):
+    def p_mean_variance(self, x, cond, t, cpa, returns: torch.Tensor = torch.ones(1, 1)):
         if self.returns_condition:
             # epsilon could be epsilon or x0 itself
 
-            epsilon_cond = self.model(x, cond, t, returns, use_dropout=False)
-            epsilon_uncond = self.model(x, cond, t, returns, force_dropout=True)
+            epsilon_cond = self.model(x, cond, t, cpa, returns, use_dropout=False)
+            epsilon_uncond = self.model(x, cond, t, cpa, returns, force_dropout=True)
             epsilon = epsilon_uncond + self.condition_guidance_w * (epsilon_cond - epsilon_uncond)
         else:
-            epsilon = self.model(x, cond, t)
+            epsilon = self.model(x, cond, t, cpa)
 
         t = t.detach().to(torch.int64)
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
@@ -401,15 +401,15 @@ class GaussianInvDynDiffusion(nn.Module):
             x_start=x_recon, x_t=x, t=t)
         return model_mean, posterior_variance, posterior_log_variance
 
-    def p_sample(self, x, cond, t, returns: torch.Tensor = torch.ones(1, 1)):
+    def p_sample(self, x, cond, t, cpa, returns: torch.Tensor = torch.ones(1, 1)):
         with torch.no_grad():
             b, _, _ = x.shape
-            model_mean, _, model_log_variance = self.p_mean_variance(x=x, cond=cond, t=t, returns=returns)
+            model_mean, _, model_log_variance = self.p_mean_variance(x=x, cond=cond, t=t, cpa=cpa, returns=returns)
             noise = 0.5 * torch.randn_like(x, device=x.device)
             nonzero_mask = (1 - (t == 0).float()).reshape(b, 1, 1)
             return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
 
-    def p_sample_loop(self, shape, cond, returns: torch.Tensor = torch.ones(1, 1)):
+    def p_sample_loop(self, shape, cond, cpa, returns: torch.Tensor = torch.ones(1, 1)):
         with torch.no_grad():
             torch.random.manual_seed(1019)
             batch_size = shape[0]
@@ -420,23 +420,23 @@ class GaussianInvDynDiffusion(nn.Module):
             for i in range(self.n_timesteps - 1, -1, -1):
                 timesteps = torch.ones(batch_size,
                                        device=cond.device) * i
-                x = self.p_sample(x, cond, timesteps, returns)
+                x = self.p_sample(x, cond, timesteps, cpa, returns)
 
                 x = apply_conditioning(x, cond, 0)
 
             return x
 
     #  @torch.no_grad()
-    def conditional_sample(self, cond, returns: torch.Tensor = torch.ones(1, 1), horizon: int = 48):
+    def conditional_sample(self, cond, cpa, returns: torch.Tensor = torch.ones(1, 1), horizon: int = 48):
         with torch.no_grad():
             batch_size = 1
             horizon = self.horizon
             shape = torch.tensor([batch_size, horizon, self.observation_dim])
 
-            return self.p_sample_loop(shape, cond, returns)
+            return self.p_sample_loop(shape, cond, cpa, returns)
 
-    def forward(self, cond, returns):
-        return self.conditional_sample(cond=cond, returns=returns)
+    def forward(self, cond, cpa, returns):
+        return self.conditional_sample(cond=cond, cpa=cpa, returns=returns)
 
     # ------------------------------------------ training ------------------------------------------#
 
@@ -453,11 +453,11 @@ class GaussianInvDynDiffusion(nn.Module):
 
         return sample
 
-    def p_losses(self, x_start, cond, t, returns=None, masks=None):
+    def p_losses(self, x_start, cond, t, cpa, returns=None, masks=None):
         noise = torch.randn_like(x_start, device=x_start.device)
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         t = t.to(x_noisy.device)
-        x_recon = self.model(x_noisy, cond, t, returns)
+        x_recon = self.model(x_noisy, cond, t, cpa, returns)
 
         if self.predict_epsilon:
             loss, info = self.loss_fn(x_recon, noise, masks)
@@ -466,11 +466,11 @@ class GaussianInvDynDiffusion(nn.Module):
 
         return loss, info
 
-    def loss(self, x, cond, returns, masks):
+    def loss(self, x, cond, cpa, returns, masks):
 
         batch_size = len(x)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
-        diffuse_loss, info = self.p_losses(x[:, :, self.action_dim:], cond, t, returns, masks)
+        diffuse_loss, info = self.p_losses(x[:, :, self.action_dim:], cond, t, cpa, returns, masks)
         # Calculating inv loss
         x_t = x[:, :-1, self.action_dim:]
         a_t = x[:, :-1, :self.action_dim]
@@ -557,17 +557,18 @@ class DFUSER(nn.Module):
     def toCuda(self):
         self.diffuser.cuda()
 
-    def trainStep(self, states, actions, returns, masks):
+    def trainStep(self, states, actions, cpa, returns, masks):
         self.diffuser.train()
         if self.use_cuda:
             self.diffuser.cuda()
             states = states.cuda()
             actions = actions.cuda()
+            cpa = cpa.cuda()
             returns = returns.cuda()
             masks = masks.cuda()
         x = torch.cat([actions, states], dim=-1)
         cond = torch.ones_like(states[:, 0], device=states.device)[:, None, :]
-        loss, infos, (diffuse_loss, inv_loss) = self.diffuser.loss(x, cond, returns=returns, masks=masks)
+        loss, infos, (diffuse_loss, inv_loss) = self.diffuser.loss(x, cond, cpa, returns=returns, masks=masks)
         inv_loss.backward()
         self.invModel_optimizer.step()
         self.invModel_optimizer.zero_grad()
@@ -578,7 +579,7 @@ class DFUSER(nn.Module):
 
         return loss, (diffuse_loss, inv_loss)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, cpa):
         if len(list(x.shape)) < 2:
             x = torch.reshape(x, [48, self.num_of_states + 1])
         else:
@@ -589,7 +590,7 @@ class DFUSER(nn.Module):
         states = states[:, :-1]
         conditions = states
         returns = torch.tensor([[1.0]], device=x.device)
-        x_0 = self.diffuser(cond=conditions, returns=returns)
+        x_0 = self.diffuser(cond=conditions, cpa=cpa, returns=returns)
 
         states = x_0[0, :cur_time + 1]
         states_next = states[None, -1]

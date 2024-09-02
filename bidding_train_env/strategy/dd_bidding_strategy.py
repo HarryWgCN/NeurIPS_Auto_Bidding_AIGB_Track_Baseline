@@ -11,17 +11,15 @@ class DdBiddingStrategy(BaseBiddingStrategy):
     Decision-Diffuser-PlayerStrategy
     """
 
-    def __init__(self, i,budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
+    def __init__(self, i, budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
-        file_name = os.path.dirname(os.path.realpath(__file__))
-        dir_name = os.path.dirname(file_name)
-        dir_name = os.path.dirname(dir_name)
-        model_path = os.path.join(dir_name, "saved_model", "DDtest", f"diffuser_{i}.pt")
+        model_path = os.path.join('/home/disk2/auto-bidding/models', f'diffuser_{i}.pt')
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)
         self.state_dim = 16
         self.input = np.zeros((48, self.state_dim + 1))
+        self.cpa = torch.tensor([[[cpa]]], device=self.device, dtype=torch.float32)
 
     def reset(self):
         self.remaining_budget = self.budget
@@ -97,7 +95,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
             self.input[timeStepIndex, i] = test_state[i]
         self.input[:, -1] = timeStepIndex
         x = torch.tensor(self.input.reshape(-1), device=self.device)
-        alpha = self.model(x)
+        alpha = self.model(x, self.cpa)
         alpha = alpha.item()
         alpha = max(0, alpha)
         bids = alpha * pValues

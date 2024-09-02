@@ -67,6 +67,7 @@ def run_test(i):
         over_cost_ratio = max((np.sum(tick_cost) - agent.remaining_budget) / (np.sum(tick_cost) + 1e-4), 0)
         #循环保证不会超预算
         while over_cost_ratio > 0:#超过预算
+            print('Exceeding Budget Constraint')
             pv_index = np.where(tick_status == 1)[0]  #找到赢得展现机会的索引
             #选取一部分索引
             dropped_pv_index = np.random.choice(pv_index, int(math.ceil(pv_index.shape[0] * over_cost_ratio)),
