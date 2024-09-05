@@ -22,14 +22,14 @@ def getScore_nips(reward, cpa, cpa_constraint):
     return penalty * reward
 
 
-def run_test():
+def run_test(i):
     """
     offline evaluation
     """
 
-    data_loader = TestDataLoader(file_path='./data/traffic/period-7.csv')
+    data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic/period-7.csv')
     env = OfflineEnv()
-    agent = PlayerBiddingStrategy()
+    agent = PlayerBiddingStrategy(i)
     print(agent.name)
 
     keys, test_dict = data_loader.keys, data_loader.test_dict
@@ -44,17 +44,17 @@ def run_test():
         'historyPValueInfo': []
     }
 
-    for timeStep_index in range(num_timeStepIndex):
-        logger.info(f'Timestep Index: {timeStep_index + 1} Begin')
+    for timeStep_index in range(num_timeStepIndex): #循环每个决策步
+        # logger.info(f'Timestep Index: {timeStep_index + 1} Begin')
 
-        pValue = pValues[timeStep_index]
+        pValue = pValues[timeStep_index]#表示广告曝光给用户时的转化概率
         pValueSigma = pValueSigmas[timeStep_index]
         leastWinningCost = leastWinningCosts[timeStep_index]
 
         if agent.remaining_budget < env.min_remaining_budget:
-            bid = np.zeros(pValue.shape[0])
+            bid = np.zeros(pValue.shape[0])#此时出价为0
         else:
-
+            #出价
             bid = agent.bidding(timeStep_index, pValue, pValueSigma, history["historyPValueInfo"],
                                 history["historyBids"],
                                 history["historyAuctionResult"], history["historyImpressionResult"],
@@ -65,10 +65,14 @@ def run_test():
 
         # Handling over-cost (a timestep costs more than the remaining budget of the bidding advertiser)
         over_cost_ratio = max((np.sum(tick_cost) - agent.remaining_budget) / (np.sum(tick_cost) + 1e-4), 0)
-        while over_cost_ratio > 0:
-            pv_index = np.where(tick_status == 1)[0]
+        #循环保证不会超预算
+        while over_cost_ratio > 0:#超过预算
+            print('Exceeding Budget Constraint')
+            pv_index = np.where(tick_status == 1)[0]  #找到赢得展现机会的索引
+            #选取一部分索引
             dropped_pv_index = np.random.choice(pv_index, int(math.ceil(pv_index.shape[0] * over_cost_ratio)),
                                                 replace=False)
+            #对应索引的出价置为0
             bid[dropped_pv_index] = 0
             tick_value, tick_cost, tick_status, tick_conversion = env.simulate_ad_bidding(pValue, pValueSigma, bid,
                                                                                           leastWinningCost)
@@ -92,12 +96,15 @@ def run_test():
     cpa_constraint = agent.cpa
     score = getScore_nips(all_reward, cpa_real, cpa_constraint)
 
+    print("模型索引------:",i,"------END")
     logger.info(f'Total Reward: {all_reward}')
     logger.info(f'Total Cost: {all_cost}')
     logger.info(f'CPA-real: {cpa_real}')
     logger.info(f'CPA-constraint: {cpa_constraint}')
     logger.info(f'Score: {score}')
+    return i,all_reward,all_cost,cpa_real,cpa_constraint,score
 
 
 if __name__ == '__main__':
-    run_test()
+    for i in range(0,100):
+        run_test(i)
