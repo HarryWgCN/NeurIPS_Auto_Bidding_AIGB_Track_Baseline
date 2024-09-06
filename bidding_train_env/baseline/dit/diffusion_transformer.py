@@ -249,7 +249,7 @@ class DiT(nn.Module):
         mlp_ratio=4.0,
         class_dropout_prob=0.1,
         num_classes=1000,
-        x_size=16,
+        x_size=19,
         learn_sigma=False,
     ):
         super().__init__()

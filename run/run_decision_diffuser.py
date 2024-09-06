@@ -48,7 +48,7 @@ def run_decision_diffuser(
                 f"Epoch {epoch} 第{batch_index}个batch训练时间为: {end_time - start_time} s, all_loss: {all_loss}, diffuse_loss: {diffuse_loss}, inv_loss: {inv_loss}")
         # 保存每轮结果
         print('---------------------------------------------------')
-        algorithm.save_net(os.path.join(save_dir, f'diffuser_{epoch}.pt'), epoch)
+        algorithm.save_net(save_dir, epoch)
         print(f'第 {epoch} 轮 model saved to {save_dir}')
 
     # algorithm.save_model(save_path, epi)

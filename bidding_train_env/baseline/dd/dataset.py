@@ -10,8 +10,7 @@ class aigb_dataset(Dataset):
     def __init__(self, step_len, **kwargs) -> None:
         super().__init__()
         # 用单个轨迹数据进行训练
-        states, actions, cpa, rewards, terminals = load_local_data_nips(
-            train_data_path="/home/disk2/auto-bidding/data/trajectory/trajectory_data_truncated.csv")
+        states, actions, cpa, rewards, terminals = load_local_data_nips()
         # 用所有的轨迹数据进行训练
         # states, actions, rewards, terminals = load_local_data_nips_com(
         #     data_paths=["/home/disk2/auto-bidding/data/trajectory/trajectory_data.csv","/home/disk2/auto-bidding/data/trajectory/trajectory_data_extended_1.csv",
@@ -78,7 +77,7 @@ def load_local_data(data_version):
     return states, actions, rewards, terminals
 
 
-def load_local_data_nips(train_data_path="/home/disk2/auto-bidding/data/traffic/training_data_rlData_folder/training_data_all-rlData.csv"):
+def load_local_data_nips(train_data_path="/home/disk2/auto-bidding/data/training-data/training_data_all-rlData.csv"):
     training_data = pd.read_csv(train_data_path)
 
     def safe_literal_eval(val):

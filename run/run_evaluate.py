@@ -12,6 +12,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic/period-7.csv')
+env = OfflineEnv()
 
 def getScore_nips(reward, cpa, cpa_constraint):
     beta = 2
@@ -27,8 +29,6 @@ def run_test(i):
     offline evaluation
     """
 
-    data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic/period-7.csv')
-    env = OfflineEnv()
     agent = PlayerBiddingStrategy(i)
     print(agent.name)
 
@@ -89,7 +89,7 @@ def run_test(i):
         history["historyAuctionResult"].append(temAuctionResult)
         temImpressionResult = np.array([(tick_conversion[i], tick_conversion[i]) for i in range(pValue.shape[0])])
         history["historyImpressionResult"].append(temImpressionResult)
-        logger.info(f'Timestep Index: {timeStep_index + 1} End')
+        # logger.info(f'Timestep Index: {timeStep_index + 1} End')
     all_reward = np.sum(rewards)
     all_cost = agent.budget - agent.remaining_budget
     cpa_real = all_cost / (all_reward + 1e-10)
@@ -103,8 +103,3 @@ def run_test(i):
     logger.info(f'CPA-constraint: {cpa_constraint}')
     logger.info(f'Score: {score}')
     return i,all_reward,all_cost,cpa_real,cpa_constraint,score
-
-
-if __name__ == '__main__':
-    for i in range(0,100):
-        run_test(i)

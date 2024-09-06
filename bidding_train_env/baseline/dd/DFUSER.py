@@ -495,7 +495,7 @@ class GaussianInvDynDiffusion(nn.Module):
 
 
 class DFUSER(nn.Module):
-    def __init__(self, dim_obs=16, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
+    def __init__(self, dim_obs=19, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
                  network_random_seed=200,
                  ACTION_MAX=10, ACTION_MIN=0,
                  step_len=48, n_timesteps=10):
