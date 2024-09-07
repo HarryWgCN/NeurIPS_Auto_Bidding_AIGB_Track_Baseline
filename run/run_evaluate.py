@@ -27,10 +27,10 @@ def run_test(i):
     offline evaluation
     """
 
-    data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic/period-7.csv')
+    data_loader = TestDataLoader(file_path='./data/traffic/period-7.csv')
     env = OfflineEnv()
-    agent = PlayerBiddingStrategy(i)
-    print(agent.name)
+    agent = PlayerBiddingStrategy(i=i)
+    print(agent.name,agent.budget)
 
     keys, test_dict = data_loader.keys, data_loader.test_dict
     key = keys[0]
@@ -62,7 +62,7 @@ def run_test(i):
 
         tick_value, tick_cost, tick_status, tick_conversion = env.simulate_ad_bidding(pValue, pValueSigma, bid,
                                                                                       leastWinningCost)
-
+        print("bid",bid.shape)
         # Handling over-cost (a timestep costs more than the remaining budget of the bidding advertiser)
         over_cost_ratio = max((np.sum(tick_cost) - agent.remaining_budget) / (np.sum(tick_cost) + 1e-4), 0)
         #循环保证不会超预算
@@ -94,6 +94,7 @@ def run_test(i):
     all_cost = agent.budget - agent.remaining_budget
     cpa_real = all_cost / (all_reward + 1e-10)
     cpa_constraint = agent.cpa
+    print(agent.budget , agent.remaining_budget,cpa_constraint,all_reward)
     score = getScore_nips(all_reward, cpa_real, cpa_constraint)
 
     print("模型索引------:",i,"------END")
@@ -106,5 +107,5 @@ def run_test(i):
 
 
 if __name__ == '__main__':
-    for i in range(0,100):
-        run_test(i)
+    # for i in range(0,100):
+        run_test(23)
