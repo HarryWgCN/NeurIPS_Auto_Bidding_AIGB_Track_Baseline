@@ -17,7 +17,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)
-        self.state_dim = 19
+        self.state_dim = 22
         self.input = np.zeros((48, self.state_dim + 1))
 
     def reset(self):
@@ -61,6 +61,9 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         slot_1_exposure = 0
         slot_2_exposure = 0
         slot_3_exposure = 0
+        slot_1_win_least_alpha = 1
+        slot_2_win_least_alpha = 1
+        slot_3_win_least_alpha = 1
         for timeStepIndex in range(0, len(historyAuctionResult)):
             for pvindex in range(0, len(historyAuctionResult[timeStepIndex])):
                 # winning
@@ -68,16 +71,22 @@ class DdBiddingStrategy(BaseBiddingStrategy):
                     # slot
                     if history_slot[timeStepIndex][pvindex] == 1:
                         slot_1_win += 1
+                        alpha = historyBid[timeStepIndex][pvindex] / history_pValue[timeStepIndex][pvindex]
+                        slot_1_win_least_alpha = min(slot_1_win_least_alpha, alpha)
                         # exposed
                         if history_exposure[timeStepIndex][pvindex] == 1:
                             slot_1_exposure += 1
                     if history_slot[timeStepIndex][pvindex] == 2:
                         slot_2_win += 1
+                        alpha = historyBid[timeStepIndex][pvindex] / history_pValue[timeStepIndex][pvindex]
+                        slot_2_win_least_alpha = min(slot_2_win_least_alpha, alpha)
                         # exposed
                         if history_exposure[timeStepIndex][pvindex] == 1:
                             slot_3_exposure += 1
                     if history_slot[timeStepIndex][pvindex] == 3:
                         slot_3_win += 1
+                        alpha = historyBid[timeStepIndex][pvindex] / history_pValue[timeStepIndex][pvindex]
+                        slot_3_win_least_alpha = min(slot_3_win_least_alpha, alpha)
                         # exposed
                         if history_exposure[timeStepIndex][pvindex] == 1:
                             slot_3_exposure += 1
@@ -119,7 +128,8 @@ class DdBiddingStrategy(BaseBiddingStrategy):
             historical_xi_mean, last_three_LeastWinningCost_mean, last_three_pValues_mean,
             last_three_conversion_mean, last_three_xi_mean,
             current_pValues_mean, current_pv_num, last_three_pv_num_total,
-            historical_pv_num_total, historical_slot_1_exposure_rate, historical_slot_2_exposure_rate, historical_slot_3_exposure_rate
+            historical_pv_num_total, historical_slot_1_exposure_rate, historical_slot_2_exposure_rate, historical_slot_3_exposure_rate,
+            slot_1_win_least_alpha, slot_2_win_least_alpha, slot_3_win_least_alpha
         ])
 
         for i in range(self.state_dim):

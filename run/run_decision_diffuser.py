@@ -5,12 +5,12 @@ from bidding_train_env.baseline.dd.DFUSER import (DFUSER)
 import time
 from bidding_train_env.baseline.dd.dataset import aigb_dataset
 from torch.utils.data import DataLoader
-
+from run.run_evaluate import run_test
 
 def run_decision_diffuser(
         save_dir="/home/disk2/auto-bidding/models",
         train_epoch=1,
-        batch_size=1000):
+        batch_size=10000):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("train_epoch", train_epoch)
     print("batch-size", batch_size)
@@ -47,9 +47,11 @@ def run_decision_diffuser(
             print(
                 f"Epoch {epoch} 第{batch_index}个batch训练时间为: {end_time - start_time} s, all_loss: {all_loss}, diffuse_loss: {diffuse_loss}, inv_loss: {inv_loss}")
         # 保存每轮结果
-        print('---------------------------------------------------')
-        algorithm.save_net(save_dir, epoch)
+        # algorithm.save_net(save_dir, epoch)
+        algorithm.save_net(save_dir, 'temp')
         print(f'第 {epoch} 轮 model saved to {save_dir}')
+        run_test('temp')
+        print('---------------------------------------------------')
 
     # algorithm.save_model(save_path, epi)
     # algorithm.save_net(save_dir, train_epoch)

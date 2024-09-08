@@ -488,14 +488,15 @@ class GaussianInvDynDiffusion(nn.Module):
         a_t = a_t.reshape(-1, self.action_dim)
         a_t = a_t[masks_flat]
         pred_a_t = self.inv_model(x_comb_t)
-        inv_loss = F.mse_loss(pred_a_t, a_t)
+        cpa_info = cpa.squeeze(0)[:-1]
+        inv_loss = 0.3 * F.mse_loss(pred_a_t, a_t) + 0.7 * F.mse_loss(pred_a_t, cpa_info)
         loss = (1 / 2) * (diffuse_loss + inv_loss)
 
         return loss, info, (diffuse_loss, inv_loss)
 
 
 class DFUSER(nn.Module):
-    def __init__(self, dim_obs=19, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
+    def __init__(self, dim_obs=22, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
                  network_random_seed=200,
                  ACTION_MAX=10, ACTION_MIN=0,
                  step_len=48, n_timesteps=10):

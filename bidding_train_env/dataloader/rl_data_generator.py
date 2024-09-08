@@ -90,6 +90,10 @@ class RlDataGenerator:
             group['slot_1_exposed'] = group.apply(lambda row: 1 if row['isExposed'] == 1 and row['adSlot'] == 1 else 0, axis=1)
             group['slot_2_exposed'] = group.apply(lambda row: 1 if row['isExposed'] == 1 and row['adSlot'] == 2 else 0, axis=1)
             group['slot_3_exposed'] = group.apply(lambda row: 1 if row['isExposed'] == 1 and row['adSlot'] == 3 else 0, axis=1)
+            # slot_1_win_least_alpha: 表示广告主赢得slot1 的最小alpha action
+            group['slot_1_win_least_alpha'] = group.apply(lambda row: row['bid'] / row['pValue'] if row['adSlot'] == 1 else 2, axis=1)
+            group['slot_2_win_least_alpha'] = group.apply(lambda row: row['bid'] / row['pValue'] if row['adSlot'] == 2 else 2, axis=1)
+            group['slot_3_win_least_alpha'] = group.apply(lambda row: row['bid'] / row['pValue'] if row['adSlot'] == 3 else 2, axis=1)
 
             # 对 timeStepIndex_volume_sum 进行滚动计算，计算最近三个值的和，然后向后移动一位，填充缺失值，并转换为整数型
             last_3_timeStepIndexs_volume = timeStepIndex_volume_sum.rolling(window=3, min_periods=1).sum().shift(
@@ -116,7 +120,10 @@ class RlDataGenerator:
                 'slot_2_win': 'sum',
                 'slot_2_exposed': 'sum',
                 'slot_3_win': 'sum',
-                'slot_3_exposed': 'sum'
+                'slot_3_exposed': 'sum',
+                'slot_1_win_least_alpha': 'min',
+                'slot_2_win_least_alpha': 'min',
+                'slot_3_win_least_alpha': 'min'
             }).reset_index()  # 将结果中的索引列重置为默认的整数索引，将之前的分组键列 'timeStepIndex' 变成一个普通的列
             
             # 计算了这些列的扩展均值和最近三个值的滚动平均值
@@ -126,6 +133,9 @@ class RlDataGenerator:
             for col in ['slot_1_win', 'slot_1_exposed', 'slot_2_win', 'slot_2_exposed', 'slot_3_win', 'slot_3_exposed']:
                 group_agg[f'sum_{col}_all'] = group_agg[col].expanding().sum().shift(1)
                 group_agg[f'sum_{col}_last_3'] = group_agg[col].rolling(window=3, min_periods=1).sum().shift(1)
+            for col in ['slot_1_win_least_alpha', 'slot_2_win_least_alpha', 'slot_3_win_least_alpha']:
+                group_agg[f'min_{col}_all'] = group_agg[col].expanding().min().shift(1)
+                group_agg[f'min_{col}_last_3'] = group_agg[col].rolling(window=3, min_periods=1).min().shift(1)
 
             # 将 group 和 group_agg 按照 'timeStepIndex' 列进行合并
             # suffixes=('', '_agg') 参数指定了如果存在重叠的列名时如何添加后缀以区分这些列
@@ -177,6 +187,9 @@ class RlDataGenerator:
                     state_features['sum_slot_1_exposed_all'] / state_features['sum_slot_1_win_all'], # 坑位1的展现概率
                     state_features['sum_slot_2_exposed_all'] / state_features['sum_slot_2_win_all'], # 坑位2的展现概率
                     state_features['sum_slot_3_exposed_all'] / state_features['sum_slot_3_win_all'], # 坑位3的展现概率
+                    state_features['min_slot_1_win_least_alpha_all'],  # 坑位1的最低获胜alpha
+                    state_features['min_slot_2_win_least_alpha_all'],  # 坑位2的最低获胜alpha
+                    state_features['min_slot_3_win_least_alpha_all'],  # 坑位3的最低获胜alpha
                 )
 
                 total_bid = current_timeStepIndex_data['bid'].sum() #一个决策步的出价总和

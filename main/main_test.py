@@ -10,8 +10,8 @@ torch.manual_seed(1)
 np.random.seed(1)
 
 if __name__ == "__main__":
-    for i in range(0,100):
-        run_test(i)
+    # for i in range(0,100):
+    run_test('temp')
     
 # test different epoch evaluate result
 
