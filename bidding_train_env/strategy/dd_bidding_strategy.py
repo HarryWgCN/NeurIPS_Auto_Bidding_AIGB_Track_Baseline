@@ -140,6 +140,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         alpha = self.model(x, cpa_tensor)
         alpha = alpha.item()
         alpha = max(0, alpha)
+        alpha = 0.2 * alpha + 0.8 * self.cpa
         bids = alpha * pValues
-        
+
         return bids
