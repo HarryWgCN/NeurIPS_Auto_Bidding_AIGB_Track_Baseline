@@ -15,7 +15,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
     Decision-Transformer-PlayerStrategy
     """
 
-    def __init__(self, i,budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1):
+    def __init__(self, i,budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1, base_model_path='', base_pkl_path = ''):
         super().__init__(budget, name, cpa, category)
 
         file_name = os.path.dirname(os.path.realpath(__file__))
@@ -23,7 +23,14 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         dir_name = os.path.dirname(dir_name)
         model_path = os.path.join(dir_name, "saved_model", "DTtest", "dt.pt")
         picklePath = os.path.join(dir_name, "saved_model", "DTtest", "normalize_dict.pkl")
-
+        
+        # 如果传入模拟agent模型路径，则修改路径
+        if base_model_path != '':
+            model_path = base_model_path
+            
+        if base_pkl_path != '':
+            picklePath = base_pkl_path
+        
         with open(picklePath, 'rb') as f:
             normalize_dict = pickle.load(f)
         self.model = DecisionTransformer(state_dim=16, act_dim=1, state_mean=normalize_dict["state_mean"],

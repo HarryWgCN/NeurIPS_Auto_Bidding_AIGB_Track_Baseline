@@ -11,9 +11,12 @@ class DdBiddingStrategy(BaseBiddingStrategy):
     Decision-Diffuser-PlayerStrategy
     """
 
-    def __init__(self, i, budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
+    def __init__(self, i, base_model_path = '', budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
         model_path = os.path.join('/home/disk2/auto-bidding/models', f'diffuser_{i}.pt')
+        # 如果传入模拟agent模型路径，则修改路径
+        if base_model_path != '':
+            model_path = base_model_path
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)
