@@ -13,8 +13,8 @@ class OfflineEnv:
         """
         #用于设置允许竞价广告商保留的最低剩余预算。
         self.min_remaining_budget = min_remaining_budget
-
-    def simulate_ad_bidding(self, pValues: np.ndarray,pValueSigmas: np.ndarray, bids: np.ndarray, leastWinningCosts: np.ndarray, bids_other: list):
+    # def simulate_ad_bidding(self, pValues: np.ndarray,pValueSigmas: np.ndarray, bids: np.ndarray, leastWinningCosts: np.ndarray):
+    def simulate_ad_bidding(self, pValues: np.ndarray,pValueSigmas: np.ndarray,  bids_other: list):
         """
         Simulate the advertising bidding process.
 
@@ -28,7 +28,6 @@ class OfflineEnv:
         
         # ----------------------------------- stimulate agents -------------------------------------
         
-        bids_other['player'] = bids
         bids_matrix = np.array(list(bids_other.values()))
         bids_sorted = np.sort(bids_matrix, axis=0)
         leastWinningCosts = bids_sorted[-4, :]
@@ -42,7 +41,7 @@ class OfflineEnv:
         
         values = np.random.normal(loc=pValues, scale=pValueSigmas)
         
-        for k, v in bids_other:
+        for k, v in bids_other.items():
             tick_status[k] = v >= leastWinningCosts
             tick_cost[k] = leastWinningCosts * tick_status[k]
             _values = values*tick_status[k]
