@@ -77,7 +77,7 @@ def load_local_data(data_version):
     return states, actions, rewards, terminals
 
 
-def load_local_data_nips(train_data_path="/home/disk2/auto-bidding/data/training-data/training_data_all-rlData.csv"):
+def load_local_data_nips(train_data_path="/home/disk2/auto-bidding/data/training-data/training_data.csv"):
     training_data = pd.read_csv(train_data_path)
 
     def safe_literal_eval(val):

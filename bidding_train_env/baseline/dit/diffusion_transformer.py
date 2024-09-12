@@ -359,7 +359,9 @@ class DiT(nn.Module):
         if force_dropout:
             returns_embed = 0 * returns_embed
 
-        c = t + y + returns_embed                # (N, D)
+        # c = t + y + returns_embed                # (N, D)
+        # remove returns affecting the impact of cpa
+        c = t + y                 # (N, D)
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
@@ -462,8 +464,8 @@ def DiT_L_2(**kwargs):
 def DiT_L_4(**kwargs):
     return DiT(depth=24, hidden_size=1024, patch_size=4, num_heads=16, **kwargs)
 
-def DiT_L_8(**kwargs):
-    return DiT(input_size=(1, step_len), depth=24, hidden_size=1024, patch_size=8, num_heads=16, **kwargs)
+def DiT_L_8(step_len,dim_obs):
+    return DiT(input_size=(1, step_len), depth=24, hidden_size=1024, patch_size=8, num_heads=16)
 
 def DiT_B_2(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=2, num_heads=12, **kwargs)
@@ -471,8 +473,8 @@ def DiT_B_2(**kwargs):
 def DiT_B_4(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=4, num_heads=12, **kwargs)
 
-def DiT_B_8(**kwargs):
-    return DiT(input_size=(1, step_len), depth=12, hidden_size=768, patch_size=8, num_heads=12, **kwargs)
+def DiT_B_8(step_len,dim_obs):
+    return DiT(input_size=(1, step_len), depth=12, hidden_size=768, patch_size=8, num_heads=12)
 
 def DiT_S_2(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=2, num_heads=6, **kwargs)
