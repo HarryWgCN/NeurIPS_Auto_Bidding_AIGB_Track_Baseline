@@ -18,6 +18,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic/period-7.csv')
+env = OfflineEnv()
 
 def getScore_nips(reward, cpa, cpa_constraint):
     beta = 2
@@ -32,7 +34,9 @@ def run_test(i):
     """
     offline evaluation
     """
-
+    score_all = 0
+    reward_all = 0
+    cost_all = 0
     data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic/period-7.csv')
     env = OfflineEnv()
     # agent = PlayerBiddingStrategy(i)
@@ -43,6 +47,7 @@ def run_test(i):
  # ----------------------------------------- stimulate agent init ↓----------------------------------------
     # 每类模拟agent的个数    
     stimulate_agent_num = 3
+    # baseline 模型以及budget samples的路径
     dt_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DTtest/dt.pt'
     pkl_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DTtest/normalize_dict.pkl'
     samples_path = '/home/disk2/guoyuning-23/auto-bidding/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/budget_cpa_samples.csv'
@@ -56,10 +61,10 @@ def run_test(i):
     df = pd.read_csv(samples_path)
     random_sample = df.sample(n=9)
     print(random_sample)
-    for index, row in random_sample.iterrows():
+    for _, row in random_sample.iterrows():
         budget_cpa_sampled.append([row['budget'], int(row['CPAConstraint'])])
     # 实例化3种agent各stimulate_agent_num个，分配不同CPA和budget
-    for index in range(0, stimulate_agent_num):
+    for _ in range(0, stimulate_agent_num):
         cpa_agent = CPABiddingStrategy(budget=budget_cpa_sampled[sample_i][0], cpa=budget_cpa_sampled[sample_i][1])
         sample_i += 1
         cpa_agents.append(cpa_agent)
@@ -115,9 +120,8 @@ def run_test(i):
         leastWinningCost = leastWinningCosts[timeStep_index]
         
 # ------------------------------- stimulate agent bidding ↓-------------------------------
-        tmp_history = {}
         bids = {}
-        # bids = []
+
         for i in range(0, stimulate_agent_num):
             if cpa_agents[i].remaining_budget < env.min_remaining_budget:
                 bid_cpa = np.zeros(pValue.shape[0])
@@ -127,7 +131,6 @@ def run_test(i):
                                 stimulate_history[f'cpa_{i}']["historyAuctionResult"], stimulate_history[f'cpa_{i}']["historyImpressionResult"],
                                 history["historyLeastWinningCost"])
             bids[f'cpa_{i}'] = bid_cpa
-            # bids.append(bid_cpa)
             
             if dd_agents[i].remaining_budget < env.min_remaining_budget:
                 bid_dd = np.zeros(pValue.shape[0])
@@ -137,7 +140,6 @@ def run_test(i):
                                 stimulate_history[f'dd_{i}']["historyAuctionResult"], stimulate_history[f'dd_{i}']["historyImpressionResult"],
                                 history["historyLeastWinningCost"])
             bids[f'dd_{i}'] = bid_dd
-            # bids.append(bid_dd)
             
             if dt_agents[i].remaining_budget < env.min_remaining_budget:
                 bid_dt = np.zeros(pValue.shape[0])
@@ -146,9 +148,7 @@ def run_test(i):
                                 stimulate_history[f'dt_{i}']["historyBids"],
                                 stimulate_history[f'dt_{i}']["historyAuctionResult"], stimulate_history[f'dt_{i}']["historyImpressionResult"],
                                 history["historyLeastWinningCost"])
-            bids[f'dt_{i}'] = bid_dt
-            # bids.append(bid_dt)
-            
+            bids[f'dt_{i}'] = bid_dt      
 
 # ----------------------------------------- stimulate agent bidding ↑----------------------------------------
 
@@ -161,10 +161,9 @@ def run_test(i):
                                 history["historyAuctionResult"], history["historyImpressionResult"],
                                 history["historyLeastWinningCost"])
 
-        # 构成一共10个元素的出价字典
+        # 构成一共stimulate_agent_num + 1个元素的出价字典
         bids['player'] = bid
-        print('bids from all agents')
-        print(bids)
+
         # 返回字典，包括player和stimulate agents
         tick_value, tick_cost, tick_status, tick_conversion, leastWinningCost = env.simulate_ad_bidding(pValue, pValueSigma, 
                                                                                        bids)
@@ -201,7 +200,7 @@ def run_test(i):
             tmp_agent.remaining_budget -= np.sum(tick_cost[agent_name])
         # -------------------------------------------- all agents to be caculated ↑-------------------------------
 
-        # ---------------------------------------------- origin code of above --------------------------------------
+        # ---------------------------------------------- original code ----------------------------------------
         # over_cost_ratio = max((np.sum(tick_cost) - agent.remaining_budget) / (np.sum(tick_cost) + 1e-4), 0)
         # while over_cost_ratio > 0:
         #     pv_index = np.where(tick_status == 1)[0]
@@ -223,9 +222,8 @@ def run_test(i):
                 temImpressionResult = np.array([(tick_conversion[agent_name][i], tick_conversion[agent_name][i]) for i in range(pValue.shape[0])])
                 stimulate_history[agent_name]['historyImpressionResult'].append(temImpressionResult)
         # ----------------------------------- deal with history of stimulate agents ----------------------------------
-        print("-------------------------least winning cost :")
-        print(leastWinningCost)
-        # 以下代码针对player agent进行，因为字典的关系，所有的stimulate输出都加入key:"player"，源代码只需删除所有“['player']”
+        # print(f"-------------------------least winning cost :{leastWinningCost}-----------------------------------")
+        # 以下代码针对player agent进行，因为字典的关系，所有的stimulate输出都加入key:"player"”
         rewards[timeStep_index] = np.sum(tick_conversion['player'])
         temHistoryPValueInfo = [(pValue[i], pValueSigma[i]) for i in range(pValue.shape[0])]
         history["historyPValueInfo"].append(np.array(temHistoryPValueInfo))
@@ -238,20 +236,18 @@ def run_test(i):
         history["historyImpressionResult"].append(temImpressionResult)
         logger.info(f'Timestep Index: {timeStep_index + 1} End')
     all_reward = np.sum(rewards)
+
     all_cost = agent.budget - agent.remaining_budget
     cpa_real = all_cost / (all_reward + 1e-10)
     cpa_constraint = agent.cpa
     score = getScore_nips(all_reward, cpa_real, cpa_constraint)
+    score_all += score
+    reward_all += all_reward
+    cost_all += all_cost
 
+    
     print("模型索引------:",i,"------END")
-    logger.info(f'Total Reward: {all_reward}')
-    logger.info(f'Total Cost: {all_cost}')
-    logger.info(f'CPA-real: {cpa_real}')
-    logger.info(f'CPA-constraint: {cpa_constraint}')
-    logger.info(f'Score: {score}')
-    return i,all_reward,all_cost,cpa_real,cpa_constraint,score
-
-
-if __name__ == '__main__':
-    for i in range(0,100):
-        run_test(i)
+    logger.info(f'Score: {score_all / len(keys)}')
+    logger.info(f'Reward: {reward_all / len(keys)}')
+    logger.info(f'Cost: {cost_all / len(keys)}')
+    # return i,all_reward,all_cost,cpa_real,cpa_constraint,score

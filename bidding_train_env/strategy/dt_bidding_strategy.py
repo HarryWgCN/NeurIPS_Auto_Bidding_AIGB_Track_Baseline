@@ -108,10 +108,15 @@ class DtBiddingStrategy(BaseBiddingStrategy):
 
         if timeStepIndex == 0:
             self.model.init_eval()
-
+        
         alpha = self.model.take_actions(test_state,
                                         pre_reward=sum(history_conversion[-1]) if len(history_conversion) != 0 else None)
+        # 处理负alpha的情况
+        if alpha < 0 : 
+            alpha = 0
+            
         bids = alpha * pValues
-        return bids
+
+        return bids 
 
 

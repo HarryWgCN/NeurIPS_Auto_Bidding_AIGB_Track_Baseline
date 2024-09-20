@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops.layers.torch import Rearrange
-from bidding_train_env.baseline.dit.diffusion_transformer import DiT_S_8
+from bidding_train_env.baseline.dit.diffusion_transformer import DiT_S_8, DiT_S_4, DiT_B_8, DiT_L_8
 
 # 生成正弦位置编码
 class SinusoidalPosEmb(nn.Module):
@@ -483,19 +483,20 @@ class GaussianInvDynDiffusion(nn.Module):
             dim=1)
         x_comb_t = torch.cat([x_t_2, x_t_3, x_t, x_t_1], dim=-1)
         x_comb_t = x_comb_t.reshape(-1, 4 * self.observation_dim)
-        masks_flat = masks[:, :-1].reshape(-1)
-        x_comb_t = x_comb_t[masks_flat]
         a_t = a_t.reshape(-1, self.action_dim)
+        masks_flat = masks[:, :-1].reshape(-1)
         a_t = a_t[masks_flat]
+        x_comb_t = x_comb_t[masks_flat]
         pred_a_t = self.inv_model(x_comb_t)
+
         inv_loss = F.mse_loss(pred_a_t, a_t)
-        loss = (1 / 2) * (diffuse_loss + inv_loss)
+        loss = (1/2) * (diffuse_loss + inv_loss)
 
         return loss, info, (diffuse_loss, inv_loss)
 
 
 class DFUSER(nn.Module):
-    def __init__(self, dim_obs=16, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
+    def __init__(self, dim_obs=22, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
                  network_random_seed=200,
                  ACTION_MAX=10, ACTION_MIN=0,
                  step_len=48, n_timesteps=10):
@@ -519,7 +520,10 @@ class DFUSER(nn.Module):
         #     condition_dropout=0.25,
         #     calc_energy=False
         # )
-        model = DiT_S_8(step_len, dim_obs)
+        # TODO use different models
+        model = DiT_S_4(step_len, dim_obs)
+        # model = DiT_B_8(step_len, dim_obs)
+        # model = DiT_L_8(step_len, dim_obs)
 
         self.diffuser = GaussianInvDynDiffusion(
             model=model,
@@ -569,6 +573,7 @@ class DFUSER(nn.Module):
         x = torch.cat([actions, states], dim=-1)
         cond = torch.ones_like(states[:, 0], device=states.device)[:, None, :]
         loss, infos, (diffuse_loss, inv_loss) = self.diffuser.loss(x, cond, cpa, returns=returns, masks=masks)
+
         inv_loss.backward()
         self.invModel_optimizer.step()
         self.invModel_optimizer.zero_grad()
@@ -622,7 +627,6 @@ class DFUSER(nn.Module):
     def load_net(self, load_path="saved_model/fixed_initial_budget", device='cuda:0'):
         self.diffuser.load_state_dict(torch.load(load_path, map_location='cpu'))
         self.optimizer = Adam(self.diffuser.parameters(), lr=self.diffuser_lr)
-
         self.use_cuda = torch.cuda.is_available()
         if self.use_cuda:
             self.diffuser.cuda()

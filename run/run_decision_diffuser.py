@@ -5,7 +5,7 @@ from bidding_train_env.baseline.dd.DFUSER import (DFUSER)
 import time
 from bidding_train_env.baseline.dd.dataset import aigb_dataset
 from torch.utils.data import DataLoader
-
+from run.run_evaluate import run_test
 
 def run_decision_diffuser(
         save_dir="/home/disk2/auto-bidding/models",
@@ -47,9 +47,12 @@ def run_decision_diffuser(
             print(
                 f"Epoch {epoch} 第{batch_index}个batch训练时间为: {end_time - start_time} s, all_loss: {all_loss}, diffuse_loss: {diffuse_loss}, inv_loss: {inv_loss}")
         # 保存每轮结果
-        print('---------------------------------------------------')
-        algorithm.save_net(os.path.join(save_dir, f'diffuser_{epoch}.pt'), epoch)
+        # algorithm.save_net(save_dir, epoch)
+        algorithm.save_net(save_dir, 'temp_haorui')
         print(f'第 {epoch} 轮 model saved to {save_dir}')
+        if epoch > 150:
+            run_test('temp_haorui')
+        print('---------------------------------------------------')
 
     # algorithm.save_model(save_path, epi)
     # algorithm.save_net(save_dir, train_epoch)
