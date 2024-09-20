@@ -1,44 +1,33 @@
-import time
-import gin
 import numpy as np
-import os
-import psutil
-# from saved_model.DTtest.dt import DecisionTransformer
-from bidding_train_env.baseline.dt.dt import DecisionTransformer
-from bidding_train_env.strategy.base_bidding_strategy import BaseBiddingStrategy
 import torch
-import pickle
+from bidding_train_env.strategy.base_bidding_strategy import BaseBiddingStrategy
+import numpy as np
+from bidding_train_env.baseline.dd.base_diffuser import base_diffuser
+import os
 
 
-class DtBiddingStrategy(BaseBiddingStrategy):
+class base_dd_bidding_strategy(BaseBiddingStrategy):
     """
-    Decision-Transformer-PlayerStrategy
+    Decision-Diffuser-PlayerStrategy
     """
 
-    def __init__(self, i,budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1, base_model_path='', base_pkl_path = ''):
+    def __init__(self, budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
-
         file_name = os.path.dirname(os.path.realpath(__file__))
         dir_name = os.path.dirname(file_name)
         dir_name = os.path.dirname(dir_name)
-        model_path = os.path.join(dir_name, "saved_model", "DTtest", "dt.pt")
-        picklePath = os.path.join(dir_name, "saved_model", "DTtest", "normalize_dict.pkl")
-        
-        # 如果传入模拟agent模型路径，则修改路径
-        if base_model_path != '':
-            model_path = base_model_path
-            
-        if base_pkl_path != '':
-            picklePath = base_pkl_path
-        
-        with open(picklePath, 'rb') as f:
-            normalize_dict = pickle.load(f)
-        self.model = DecisionTransformer(state_dim=16, act_dim=1, state_mean=normalize_dict["state_mean"],
-                                         state_std=normalize_dict["state_std"])
-        self.model.load_net(model_path)
+        model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser.pt")
+        model_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DDtest/diffuser.pt'
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.model = base_diffuser()
+        self.model.load_net(model_path,device =self.device)
+        self.state_dim = 16
+        self.input = np.zeros((48,self.state_dim+1))
+
 
     def reset(self):
-        self.remaining_budget = self.budget#预算
+        self.remaining_budget = self.budget
+        self.input = np.zeros((48, self.state_dim+1))
 
     def bidding(self, timeStepIndex, pValues, pValueSigmas, historyPValueInfo, historyBid,
                 historyAuctionResult, historyImpressionResult, historyLeastWinningCost):
@@ -60,9 +49,9 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         """
         time_left = (48 - timeStepIndex) / 48
         budget_left = self.remaining_budget / self.budget if self.budget > 0 else 0
-        history_xi = [result[:, 0] for result in historyAuctionResult] #获胜状态、广告坑位、支付费用
+        history_xi = [result[:, 0] for result in historyAuctionResult]
         history_pValue = [result[:, 0] for result in historyPValueInfo]
-        history_conversion = [result[:, 1] for result in historyImpressionResult] #历史展现结果：曝光和转化
+        history_conversion = [result[:, 1] for result in historyImpressionResult]
 
         historical_xi_mean = np.mean([np.mean(xi) for xi in history_xi]) if history_xi else 0
 
@@ -75,7 +64,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         historical_pValues_mean = np.mean([np.mean(value) for value in history_pValue]) if history_pValue else 0
 
         historical_bid_mean = np.mean([np.mean(bid) for bid in historyBid]) if historyBid else 0
-        #计算历史数据中最后 n 个元素的均值
+
         def mean_of_last_n_elements(history, n):
             last_three_data = history[max(0, n - 3):n]
             if len(last_three_data) == 0:
@@ -89,10 +78,10 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         last_three_pValues_mean = mean_of_last_n_elements(history_pValue, 3)
         last_three_bid_mean = mean_of_last_n_elements(historyBid, 3)
 
-        current_pValues_mean = np.mean(pValues) #转化概率的均值
-        current_pv_num = len(pValues) #转化概率的数量
+        current_pValues_mean = np.mean(pValues)
+        current_pv_num = len(pValues)
 
-        historical_pv_num_total = sum(len(bids) for bids in historyBid) if historyBid else 0 #总出价次数
+        historical_pv_num_total = sum(len(bids) for bids in historyBid) if historyBid else 0
         last_three_ticks = slice(max(0, timeStepIndex - 3), timeStepIndex)
         last_three_pv_num_total = sum(
             [len(historyBid[i]) for i in range(max(0, timeStepIndex - 3), timeStepIndex)]) if historyBid else 0
@@ -106,17 +95,13 @@ class DtBiddingStrategy(BaseBiddingStrategy):
             historical_pv_num_total
         ])
 
-        if timeStepIndex == 0:
-            self.model.init_eval()
-        
-        alpha = self.model.take_actions(test_state,
-                                        pre_reward=sum(history_conversion[-1]) if len(history_conversion) != 0 else None)
-        # 处理负alpha的情况
-        if alpha < 0 : 
-            alpha = 0
-            
+
+        for i in range(self.state_dim):
+            self.input[timeStepIndex,i] = test_state[i]
+        self.input[:,-1] = timeStepIndex
+        x = torch.tensor(self.input.reshape(-1), device=self.device)
+        alpha  = self.model(x)
+        alpha = alpha.item()
+        alpha = max(0,alpha)
         bids = alpha * pValues
-
-        return bids 
-
-
+        return bids

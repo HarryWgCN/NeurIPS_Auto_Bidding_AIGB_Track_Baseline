@@ -1,3 +1,6 @@
 # from .player_bidding_strategy import PlayerBiddingStrategy as PlayerBiddingStrategy
 # from .dt_bidding_strategy import DtBiddingStrategy as PlayerBiddingStrategy
 from .dd_bidding_strategy import DdBiddingStrategy as PlayerBiddingStrategy
+from .dt_bidding_strategy import DtBiddingStrategy as DtBiddingStrategy
+from .cpa_bidding_strategy import CPABiddingStrategy as CPABiddingStrategy
+from .base_dd_bidding_strategy import base_dd_bidding_strategy as base_dd_bidding_strategy
