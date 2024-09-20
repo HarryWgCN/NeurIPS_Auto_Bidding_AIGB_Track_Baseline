@@ -13,7 +13,8 @@ class DdBiddingStrategy(BaseBiddingStrategy):
 
     def __init__(self, i, base_model_path = '', budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
-        model_path = os.path.join('/home/disk2/auto-bidding/models', f'diffuser_{i}.pt')
+        model_path = os.path.join('/home/disk2/auto-bidding/models/diffuser_temp_haorui.pt')
+        # model_path = os.path.join('/home/disk2/auto-bidding/models', f'diffuser_{i}.pt')
         # 如果传入模拟agent模型路径，则修改路径
         if base_model_path != '':
             model_path = base_model_path

@@ -37,7 +37,8 @@ def run_test(i):
     env = OfflineEnv()
     # agent = PlayerBiddingStrategy(i)
     dd_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DDtest/diffuser.pt'
-    agent = base_dd_bidding_strategy()
+    # 传入模型编号
+    agent = PlayerBiddingStrategy(499)
     print(agent.name)
  # ----------------------------------------- stimulate agent init ↓----------------------------------------
     # 每类模拟agent的个数    
