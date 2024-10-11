@@ -74,7 +74,7 @@ class DecisionTransformer(nn.Module):
     def __init__(self, state_dim, act_dim, state_mean, state_std, action_tanh=False, K=10, max_ep_len=96, scale=2000,
                  target_return=4):
         super(DecisionTransformer, self).__init__()
-        self.device = "cpu"
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.length_times = 3
         self.hidden_size = 64
@@ -284,4 +284,3 @@ class DecisionTransformer(nn.Module):
     def load_net(self, load_path="saved_model/DTtest", device='cpu'):
         file_path = load_path
         self.load_state_dict(torch.load(file_path, map_location=device))
-        print(f"Model loaded from {self.device}.")

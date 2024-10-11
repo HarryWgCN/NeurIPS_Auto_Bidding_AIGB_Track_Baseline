@@ -147,7 +147,7 @@ class TemporalUnet(nn.Module):
     def __init__(
             self,
             horizon, # 48
-            transition_dim, # 16
+            transition_dim, # 22
             cond_dim, # 1
             dim=128,
             dim_mults=(1, 2, 4),
@@ -157,9 +157,9 @@ class TemporalUnet(nn.Module):
             kernel_size=5,
     ):
         super().__init__()
-        # [16, 128, 256, 512]
+        # [24, 128, 256, 512]
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
-        # [(16, 128), (128, 256), (256, 512)]
+        # [(24, 128), (128, 256), (256, 512)]
         in_out = list(zip(dims[:-1], dims[1:]))
 
         #激活函数
@@ -200,7 +200,7 @@ class TemporalUnet(nn.Module):
             is_last = ind >= (num_resolutions - 1)#是否是最后一个
 
             self.downs.append(nn.ModuleList([
-                #16 128 256 48 5 false/true
+                #24 128 256 48 5 false/true
                 ResidualTemporalBlock(dim_in, dim_out, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size,
                                       mish=mish),
                 ResidualTemporalBlock(dim_out, dim_out, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size,
@@ -296,7 +296,7 @@ class GaussianInvDynDiffusion(nn.Module):
         super().__init__()
 
         self.horizon = horizon # 48
-        self.observation_dim = observation_dim # 16
+        self.observation_dim = observation_dim # 22
         self.action_dim = action_dim # 1
         self.transition_dim = observation_dim + action_dim # 17
         self.model = model

@@ -11,7 +11,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
     Decision-Diffuser-PlayerStrategy
     """
 
-    def __init__(self, i, base_model_path = '', budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
+    def __init__(self, base_model_path='', budget=100, name="Decision-Diffuser-PlayerStrategy", cpa=2, category=1):
         super().__init__(budget, name, cpa, category)
         model_path = os.path.join('/home/disk2/auto-bidding/models/diffuser_temp_haorui.pt')
         # model_path = os.path.join('/home/disk2/auto-bidding/models', f'diffuser_{i}.pt')
@@ -126,6 +126,10 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         last_three_pv_num_total = sum(
             [len(historyBid[i]) for i in range(max(0, timeStepIndex - 3), timeStepIndex)]) if historyBid else 0
 
+        alphas = list()
+        current_pValues_mean = np.mean(pValues)
+        current_pv_num = len(pValues)
+
         test_state = np.array([
             time_left, budget_left, historical_bid_mean, last_three_bid_mean,
             historical_LeastWinningCost_mean, historical_pValues_mean, historical_conversion_mean,
@@ -144,7 +148,5 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         alpha = self.model(x, cpa_tensor)
         alpha = alpha.item()
         alpha = max(0, alpha)
-        # alpha = 0.2 * alpha + 0.8 * self.cpa
         bids = alpha * pValues
-
         return bids

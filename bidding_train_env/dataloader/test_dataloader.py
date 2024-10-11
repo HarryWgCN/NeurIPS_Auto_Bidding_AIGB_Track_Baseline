@@ -50,14 +50,11 @@ class TestDataLoader:
         Returns:
             pd.DataFrame: The raw data as a DataFrame.
         """
-        if os.path.exists(self.raw_data_path):
-            with open(self.raw_data_path, 'rb') as file:
-                return pickle.load(file)
-        else:
-            tem = pd.read_csv(self.file_path)
-            with open(self.raw_data_path, 'wb') as file:
-                pickle.dump(tem, file)
-            return tem
+        # always overwrite
+        tem = pd.read_csv(self.file_path)
+        with open(self.raw_data_path, 'wb') as file:
+            pickle.dump(tem, file)
+        return tem
     #对数据进行分组和排序，返回键列表和字典
     def _get_test_data_dict(self):
         """

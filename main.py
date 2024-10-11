@@ -10,4 +10,4 @@ torch.manual_seed(1)
 np.random.seed(1)
 
 if __name__ == "__main__":
-    run_decision_diffuser(train_epoch=300)
+    run_decision_diffuser()

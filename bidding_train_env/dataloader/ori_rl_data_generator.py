@@ -2,8 +2,6 @@ import os
 import pandas as pd
 import warnings
 import glob
-import time
-import argparse
 
 warnings.filterwarnings('ignore')
 
@@ -21,18 +19,14 @@ class RlDataGenerator:
         # /home/disk2/auto-bidding/data/traffic/training_data_rlData_folder
         self.training_data_path = self.file_folder_path + "/" + "training_data_rlData_folder"
 
-    def batch_generate_rl_data(self, id):
+    def batch_generate_rl_data(self):
         os.makedirs(self.training_data_path, exist_ok=True)  # 用于创建目录
         # 查找指定目录下所有以 .csv 结尾的文件，并将它们的文件路径存储在一个列表中
-        start = time.time()
         csv_files = glob.glob(os.path.join(self.file_folder_path, '*.csv'))
         print(csv_files)
         training_data_list = []
         # 处理所有csv文件
         for csv_path in csv_files:
-            csv_file_id = int(csv_path.split('/')[-1].split('.')[0].split('-')[-1])
-            if csv_file_id != id:
-                continue
             print("开始处理文件：", csv_path)
             df = pd.read_csv(csv_path)
             df_processed = self._generate_rl_data(df)  # 将一个周期的数据生成轨迹数据
@@ -43,7 +37,6 @@ class RlDataGenerator:
             training_data_list.append(df_processed)
             del df, df_processed
             print("处理文件成功：", csv_path)
-            print(f'using {time.time() - start}')
         combined_dataframe = pd.concat(training_data_list, axis=0, ignore_index=True)
         combined_dataframe_path = "/home/disk2/auto-bidding/data/training-data/training_data_all-rlData.csv"
         combined_dataframe.to_csv(combined_dataframe_path, index=False)
@@ -60,9 +53,7 @@ class RlDataGenerator:
             pd.DataFrame: The constructed training data in reinforcement learning format.
         """
 
-        schema = ['deliveryPeriodIndex', 'advertiserNumber', 'advertiserCategoryIndex', 'budget', 'CPAConstraint',
-                  'realAllCost', 'realAllConversion', 'timeStepIndex', 'state', 'action', 'reward', 'reward_continuous',
-                  'done']
+        training_data_rows = []
         # 根据以下内容进行分组：一个周期内的一个广告主在所有决策步和展现机会下的信息
         # 补充：一个周期内有50,000个展现机会，针对这些展现机会分为48个决策步，由48个agent进行出价
         # deliveryPeriodIndex: 表示当前投放周期的索引
@@ -70,7 +61,6 @@ class RlDataGenerator:
         # advertiserCategoryIndex: 表示广告主的行业类别索引
         # budget: 表示广告主在一个投放周期内的预算
         # CPAConstraint: 表示广告主的CPA约束
-        training_data = pd.DataFrame([], columns=schema)
         for (
                     deliveryPeriodIndex, advertiserNumber, advertiserCategoryIndex, budget,
                     CPAConstraint), group in df.groupby(
@@ -164,10 +154,6 @@ class RlDataGenerator:
             realAllConversion = group['conversionAction'].sum()
 
             # 一个周期一个广告主在一个决策步中的所有出价
-            schema = ['deliveryPeriodIndex', 'advertiserNumber', 'advertiserCategoryIndex', 'budget', 'CPAConstraint',
-                      'realAllCost', 'realAllConversion', 'timeStepIndex', 'state', 'action', 'reward',
-                      'reward_continuous',
-                      'done']
             for timeStepIndex in group['timeStepIndex'].unique():
                 current_timeStepIndex_data = group[group['timeStepIndex'] == timeStepIndex]
 
@@ -187,29 +173,63 @@ class RlDataGenerator:
                 bgtleft = remainingBudget / budget if budget > 0 else 0
 
                 # 当前时间步的第一行数据转换为字典形式
+                state_features = current_timeStepIndex_data.iloc[0].to_dict()
 
-                current_timeStepIndex_data['reward'] = current_timeStepIndex_data[current_timeStepIndex_data['isExposed'] == 1][
-                        'conversionAction'].sum()  # 被曝光的转化次数的总和
-                current_timeStepIndex_data['reward_continuous'] = current_timeStepIndex_data[current_timeStepIndex_data['isExposed'] == 1][
-                        'pValue'].sum()  # 被曝光的转化概率的总和
+                state = (
+                    timeleft, bgtleft,
+                    state_features['avg_bid_all'],
+                    state_features['avg_bid_last_3'],
+                    state_features['avg_leastWinningCost_all'],
+                    state_features['avg_pValue_all'],
+                    state_features['avg_conversionAction_all'],
+                    state_features['avg_xi_all'],
+                    state_features['avg_leastWinningCost_last_3'],
+                    state_features['avg_pValue_last_3'],
+                    state_features['avg_conversionAction_last_3'],
+                    state_features['avg_xi_last_3'],
+                    state_features['pValue_agg'],  # mean
+                    state_features['timeStepIndex_volume_agg'],  # 决策步索引
+                    state_features['last_3_timeStepIndexs_volume'],  # 展现机会的滚动统计
+                    state_features['historical_volume'],  # 展现机会的累积统计
+                    state_features['sum_slot_1_exposed_all'] / state_features['sum_slot_1_win_all'],  # 坑位1的展现概率
+                    state_features['sum_slot_2_exposed_all'] / state_features['sum_slot_2_win_all'],  # 坑位2的展现概率
+                    state_features['sum_slot_3_exposed_all'] / state_features['sum_slot_3_win_all'],  # 坑位3的展现概率
+                    state_features['min_slot_1_win_least_alpha_all'],  # 坑位1的最低获胜alpha
+                    state_features['min_slot_2_win_least_alpha_all'],  # 坑位2的最低获胜alpha
+                    state_features['min_slot_3_win_least_alpha_all'],  # 坑位3的最低获胜alpha
+                )
+
+                total_bid = current_timeStepIndex_data['bid'].sum()  # 一个决策步的出价总和
+                total_value = current_timeStepIndex_data['pValue'].sum()  # 一个决策步的转化概率总和（曝光/未曝光）
+                action = total_bid / total_value if total_value > 0 else 0  # 动作计算
+
+                reward = current_timeStepIndex_data[current_timeStepIndex_data['isExposed'] == 1][
+                    'conversionAction'].sum()  # 被曝光的转化次数的总和
+                reward_continuous = current_timeStepIndex_data[current_timeStepIndex_data['isExposed'] == 1][
+                    'pValue'].sum()  # 被曝光的转化概率的总和
 
                 # isEnd: 表示广告投放周期的完成状态，其中1表示是投放周期的最后一步或者广告主的剩余预算低于系统设定的最低阈值。
                 done = 1 if timeStepIndex == timeStepIndexNum - 1 or current_timeStepIndex_data['isEnd'].iloc[
                     0] == 1 else 0
-                current_timeStepIndex_data['done'] = done
-                current_timeStepIndex_data['deliveryPeriodIndex'] = deliveryPeriodIndex
-                current_timeStepIndex_data['advertiserNumber'] = advertiserNumber
-                current_timeStepIndex_data['advertiserCategoryIndex'] = advertiserCategoryIndex
-                current_timeStepIndex_data['deliveryPeriodIndex'] = deliveryPeriodIndex
-                current_timeStepIndex_data['budget'] = budget
-                current_timeStepIndex_data['CPAConstraint'] = CPAConstraint
-                current_timeStepIndex_data['realAllCost'] = realAllCost
-                current_timeStepIndex_data['realAllConversion'] = realAllConversion
-                current_timeStepIndex_data['timeStepIndex'] = timeStepIndex
-                current_timeStepIndex_data['state'] = current_timeStepIndex_data.apply(self.get_state, args=(timeleft, bgtleft), axis=1)
-                current_timeStepIndex_data['action'] = current_timeStepIndex_data['bid'] / current_timeStepIndex_data['pValue']
-                training_data = pd.concat([training_data, current_timeStepIndex_data[schema]])
 
+                # 轨迹数据
+                training_data_rows.append({
+                    'deliveryPeriodIndex': deliveryPeriodIndex,  # 表示当前投放周期的索引
+                    'advertiserNumber': advertiserNumber,  # 表示广告主的唯一标识符
+                    'advertiserCategoryIndex': advertiserCategoryIndex,  # 表示广告主的行业类别索引
+                    'budget': budget,  # 表示广告主在一个投放周期内的预算
+                    'CPAConstraint': CPAConstraint,  # 表示广告主的CPA约束。
+                    'realAllCost': realAllCost,  # 表示广告主在该投放周期下的消耗总数
+                    'realAllConversion': realAllConversion,  # 表示广告主在该投放周期下的转化总数
+                    'timeStepIndex': timeStepIndex,  # 表示当前决策步的索引
+                    'state': state,  # 当前决策步状态。
+                    'action': action,  # 当前决策步动作。
+                    'reward': reward,  # 当前决策步稀疏奖励（当前决策步转化之和）
+                    'reward_continuous': reward_continuous,  # 当前决策步连续奖励（当前决策步所有展示流量的pValue之和）
+                    'done': done  # 表示广告投放周期的完成状态，其中1表示是投放周期的最后一步或者广告主的剩余预算低于系统设定的最低阈值。
+                })
+
+        training_data = pd.DataFrame(training_data_rows)
         training_data = training_data.sort_values(by=['deliveryPeriodIndex', 'advertiserNumber', 'timeStepIndex'])
 
         training_data['next_state'] = training_data.groupby(['deliveryPeriodIndex', 'advertiserNumber'])['state'].shift(
@@ -217,44 +237,14 @@ class RlDataGenerator:
         training_data.loc[training_data['done'] == 1, 'next_state'] = None
         return training_data
 
-    def get_state(self, state_features, timeleft, bgtleft):
-        state = (
-            timeleft, bgtleft,
-            state_features['avg_bid_all'],
-            state_features['avg_bid_last_3'],
-            state_features['avg_leastWinningCost_all'],
-            state_features['avg_pValue_all'],
-            state_features['avg_conversionAction_all'],
-            state_features['avg_xi_all'],
-            state_features['avg_leastWinningCost_last_3'],
-            state_features['avg_pValue_last_3'],
-            state_features['avg_conversionAction_last_3'],
-            state_features['avg_xi_last_3'],
-            state_features['pValue_agg'],  # mean
-            state_features['timeStepIndex_volume_agg'],  # 决策步索引
-            state_features['last_3_timeStepIndexs_volume'],  # 展现机会的滚动统计
-            state_features['historical_volume'],  # 展现机会的累积统计
-            state_features['sum_slot_1_exposed_all'] / state_features['sum_slot_1_win_all'],  # 坑位1的展现概率
-            state_features['sum_slot_2_exposed_all'] / state_features['sum_slot_2_win_all'],  # 坑位2的展现概率
-            state_features['sum_slot_3_exposed_all'] / state_features['sum_slot_3_win_all'],  # 坑位3的展现概率
-            state_features['min_slot_1_win_least_alpha_all'],  # 坑位1的最低获胜alpha
-            state_features['min_slot_2_win_least_alpha_all'],  # 坑位2的最低获胜alpha
-            state_features['min_slot_3_win_least_alpha_all'],  # 坑位3的最低获胜alpha
-            state_features['pValue'],
-        )
-        return state
 
-
-def generate_rl_data(id):
-    file_folder_path = "/home/disk2/auto-bidding/data/traffic"
+def generate_rl_data():
+    # TODO change to full set
+    file_folder_path = "/home/disk2/auto-bidding/data/traffic_new_final"
     # file_folder_path = "/home/disk2/auto-bidding/data/truncated"
     data_loader = RlDataGenerator(file_folder_path=file_folder_path)
-    data_loader.batch_generate_rl_data(id)
+    data_loader.batch_generate_rl_data()
 
 
-parser = argparse.ArgumentParser(description='trajectory data generation')
-parser.add_argument('-i', '--id', type=int, default=1,
-                    help='traffic data id')
-args = parser.parse_args()
-
-generate_rl_data(args.id)
+if __name__ == '__main__':
+    generate_rl_data()
