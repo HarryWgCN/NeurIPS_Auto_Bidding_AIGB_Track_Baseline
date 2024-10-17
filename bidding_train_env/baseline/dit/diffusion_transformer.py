@@ -249,7 +249,7 @@ class DiT(nn.Module):
         mlp_ratio=4.0,
         class_dropout_prob=0.1,
         num_classes=1000,
-        x_size=22,
+        x_size=24,
         learn_sigma=False,
     ):
         super().__init__()
@@ -465,7 +465,7 @@ def DiT_L_4(**kwargs):
     return DiT(depth=24, hidden_size=1024, patch_size=4, num_heads=16, **kwargs)
 
 def DiT_L_8(step_len,dim_obs):
-    return DiT(input_size=(1, step_len), depth=24, hidden_size=1024, patch_size=8, num_heads=16)
+    return DiT(input_size=(1, step_len), depth=24, in_channels=dim_obs, hidden_size=1024, patch_size=8, num_heads=16)
 
 def DiT_B_2(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=2, num_heads=12, **kwargs)
@@ -474,7 +474,7 @@ def DiT_B_4(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=4, num_heads=12, **kwargs)
 
 def DiT_B_8(step_len,dim_obs):
-    return DiT(input_size=(1, step_len), depth=12, hidden_size=768, patch_size=8, num_heads=12)
+    return DiT(input_size=(1, step_len), depth=12, in_channels=dim_obs, hidden_size=768, patch_size=1, num_heads=4)
 
 def DiT_S_2(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=2, num_heads=6, **kwargs)
@@ -482,8 +482,8 @@ def DiT_S_2(**kwargs):
 def DiT_S_4(step_len,dim_obs):
     return DiT(input_size=(1, step_len), depth=12, in_channels=dim_obs, hidden_size=384, patch_size=1, num_heads=6)
 
-def DiT_S_8(step_len,dim_obs):
-    return DiT(input_size=(1, step_len), depth=12, in_channels=dim_obs, hidden_size=384, patch_size=1, num_heads=6)
+def DiT_S_8(**kwargs):
+    return DiT(depth=12, hidden_size=384, patch_size=1, num_heads=6, **kwargs)
 
 
 DiT_models = {

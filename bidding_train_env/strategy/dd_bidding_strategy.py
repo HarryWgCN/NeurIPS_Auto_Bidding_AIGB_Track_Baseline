@@ -21,7 +21,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = DFUSER().eval()
         self.model.load_net(model_path, device=self.device)
-        self.state_dim = 22
+        self.state_dim = 24
         self.input = np.zeros((48, self.state_dim + 1))
 
     def reset(self):
@@ -50,6 +50,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         budget_left = self.remaining_budget / self.budget if self.budget > 0 else 0
         history_xi = [result[:, 0] for result in historyAuctionResult]
         history_slot = [result[:, 1] for result in historyAuctionResult]
+        history_cost = [result[:, 2] for result in historyAuctionResult]
         history_pValue = [result[:, 0] for result in historyPValueInfo]
         history_exposure = [result[:, 0] for result in historyImpressionResult]
         history_conversion = [result[:, 1] for result in historyImpressionResult]
@@ -58,6 +59,9 @@ class DdBiddingStrategy(BaseBiddingStrategy):
 
         historical_conversion_mean = np.mean(
             [np.mean(reward) for reward in history_conversion]) if history_conversion else 0
+
+        real_cost = np.sum([np.sum(xi) for xi in history_cost]) if history_cost else 0
+        real_reward = np.sum([np.sum(xi) for xi in history_conversion]) if history_conversion else 0
 
         slot_1_win = 1e-10
         slot_2_win = 1e-10
@@ -137,7 +141,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
             last_three_conversion_mean, last_three_xi_mean,
             current_pValues_mean, current_pv_num, last_three_pv_num_total,
             historical_pv_num_total, historical_slot_1_exposure_rate, historical_slot_2_exposure_rate, historical_slot_3_exposure_rate,
-            slot_1_win_least_alpha, slot_2_win_least_alpha, slot_3_win_least_alpha
+            slot_1_win_least_alpha, slot_2_win_least_alpha, slot_3_win_least_alpha, real_cost, real_reward
         ])
 
         for i in range(self.state_dim):

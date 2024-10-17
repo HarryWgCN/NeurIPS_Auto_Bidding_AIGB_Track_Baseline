@@ -30,15 +30,15 @@ class RlDataGenerator:
             print("开始处理文件：", csv_path)
             df = pd.read_csv(csv_path)
             df_processed = self._generate_rl_data(df)  # 将一个周期的数据生成轨迹数据
-            csv_filename = os.path.basename(csv_path)
-            trainData_filename = csv_filename.replace('.csv', '-rlData.csv')
-            trainData_path = os.path.join(self.training_data_path, trainData_filename)
-            df_processed.to_csv(trainData_path, index=False)  # 写入
+            # csv_filename = os.path.basename(csv_path)
+            # trainData_filename = csv_filename.replace('.csv', '-rlData.csv')
+            # trainData_path = os.path.join(self.training_data_path, trainData_filename)
+            # df_processed.to_csv(trainData_path, index=False)  # 写入
             training_data_list.append(df_processed)
             del df, df_processed
             print("处理文件成功：", csv_path)
         combined_dataframe = pd.concat(training_data_list, axis=0, ignore_index=True)
-        combined_dataframe_path = "/home/disk2/auto-bidding/data/training-data/training_data_all-rlData.csv"
+        combined_dataframe_path = "/home/disk2/auto-bidding/data/training-data/training_data_all-rlData_dense.csv"
         combined_dataframe.to_csv(combined_dataframe_path, index=False)
         print("整合多天训练数据成功；保存至:", combined_dataframe_path)
 
@@ -83,6 +83,11 @@ class RlDataGenerator:
             # 然后将匹配到的历史累积值赋值给 'historical_volume' 列，为每个行添加了这个新的历史累积值的列。
             group['historical_volume'] = group['timeStepIndex'].map(historical_volume)  # 展现机会的累积统计（历史数据）
 
+            # real_cost 截止目前的cost
+            group['real_cost'] = group.apply(lambda row: row['isExposed'] * row['cost'], axis=1)
+            # real_reward 截止目前的reward
+            group['real_reward'] = group.apply(lambda row: row['conversionAction'], axis=1)
+
             # slot_1_win: 表示广告主在slot_1历史获胜次数。
             group['slot_1_win'] = group.apply(lambda row: 1 if row['adSlot'] == 1 else 1e-10, axis=1)
             group['slot_2_win'] = group.apply(lambda row: 1 if row['adSlot'] == 2 else 1e-10, axis=1)
@@ -122,6 +127,8 @@ class RlDataGenerator:
                 'xi': 'mean',
                 'pValue': 'mean',
                 'timeStepIndex_volume': 'first',
+                'real_cost': 'sum',
+                'real_reward': 'sum',
                 'slot_1_win': 'sum',
                 'slot_1_exposed': 'sum',
                 'slot_2_win': 'sum',
@@ -137,7 +144,7 @@ class RlDataGenerator:
             for col in ['bid', 'leastWinningCost', 'conversionAction', 'xi', 'pValue']:
                 group_agg[f'avg_{col}_all'] = group_agg[col].expanding().mean().shift(1)
                 group_agg[f'avg_{col}_last_3'] = group_agg[col].rolling(window=3, min_periods=1).mean().shift(1)
-            for col in ['slot_1_win', 'slot_1_exposed', 'slot_2_win', 'slot_2_exposed', 'slot_3_win', 'slot_3_exposed']:
+            for col in ['real_cost', 'real_reward', 'slot_1_win', 'slot_1_exposed', 'slot_2_win', 'slot_2_exposed', 'slot_3_win', 'slot_3_exposed']:
                 group_agg[f'sum_{col}_all'] = group_agg[col].expanding().sum().shift(1)
                 group_agg[f'sum_{col}_last_3'] = group_agg[col].rolling(window=3, min_periods=1).sum().shift(1)
             for col in ['slot_1_win_least_alpha', 'slot_2_win_least_alpha', 'slot_3_win_least_alpha']:
@@ -197,6 +204,8 @@ class RlDataGenerator:
                     state_features['min_slot_1_win_least_alpha_all'],  # 坑位1的最低获胜alpha
                     state_features['min_slot_2_win_least_alpha_all'],  # 坑位2的最低获胜alpha
                     state_features['min_slot_3_win_least_alpha_all'],  # 坑位3的最低获胜alpha
+                    state_features['real_cost'],  # 截止目前cost
+                    state_features['real_reward'],  # 截止目前reward
                 )
 
                 total_bid = current_timeStepIndex_data['bid'].sum()  # 一个决策步的出价总和
@@ -240,7 +249,8 @@ class RlDataGenerator:
 
 def generate_rl_data():
     # TODO change to full set
-    file_folder_path = "/home/disk2/auto-bidding/data/traffic_new_final"
+    # file_folder_path = "/home/disk2/auto-bidding/data/traffic_new_final"
+    file_folder_path = "/home/disk2/auto-bidding/data/traffic"
     # file_folder_path = "/home/disk2/auto-bidding/data/truncated"
     data_loader = RlDataGenerator(file_folder_path=file_folder_path)
     data_loader.batch_generate_rl_data()

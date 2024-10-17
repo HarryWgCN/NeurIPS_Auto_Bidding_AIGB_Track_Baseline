@@ -147,7 +147,7 @@ class TemporalUnet(nn.Module):
     def __init__(
             self,
             horizon, # 48
-            transition_dim, # 22
+            transition_dim, # 24
             cond_dim, # 1
             dim=128,
             dim_mults=(1, 2, 4),
@@ -296,7 +296,7 @@ class GaussianInvDynDiffusion(nn.Module):
         super().__init__()
 
         self.horizon = horizon # 48
-        self.observation_dim = observation_dim # 22
+        self.observation_dim = observation_dim # 24
         self.action_dim = action_dim # 1
         self.transition_dim = observation_dim + action_dim # 17
         self.model = model
@@ -496,7 +496,7 @@ class GaussianInvDynDiffusion(nn.Module):
 
 
 class DFUSER(nn.Module):
-    def __init__(self, dim_obs=22, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
+    def __init__(self, dim_obs=24, dim_actions=1, gamma=1, tau=0.01, lr=1e-4,
                  network_random_seed=200,
                  ACTION_MAX=10, ACTION_MIN=0,
                  step_len=48, n_timesteps=10):

@@ -9,8 +9,8 @@ from run.run_evaluate import run_test
 
 def run_decision_diffuser(
         save_dir="/home/disk2/auto-bidding/models",
-        dense_train_epoch=200,
-        sparse_train_epoch=300,
+        dense_train_epoch=300,
+        sparse_train_epoch=500,
         batch_size=1000):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("dense_train_epoch", dense_train_epoch)
@@ -59,7 +59,7 @@ def run_decision_diffuser(
             # 保存每轮结果
             # algorithm.save_net(save_dir, epoch)
             algorithm.save_net(save_dir, 'temp_haorui')
-            print(f'第 {epoch} 轮 model saved to {save_dir}')
+            print(f'第 {epoch} 轮 model  trained on {dataset_key} data saved to {save_dir}')
             if (epoch + 1) % 50 == 0:
                 run_test('temp_haorui')
             print('---------------------------------------------------')
