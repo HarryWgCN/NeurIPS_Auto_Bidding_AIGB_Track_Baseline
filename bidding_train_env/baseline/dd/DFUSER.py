@@ -467,7 +467,6 @@ class GaussianInvDynDiffusion(nn.Module):
         return loss, info
 
     def loss(self, x, cond, cpa, returns, masks):
-
         batch_size = len(x)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         diffuse_loss, info = self.p_losses(x[:, :, self.action_dim:], cond, t, cpa, returns, masks)
@@ -490,7 +489,23 @@ class GaussianInvDynDiffusion(nn.Module):
         pred_a_t = self.inv_model(x_comb_t)
 
         inv_loss = F.mse_loss(pred_a_t, a_t)
-        loss = (1/2) * (diffuse_loss + inv_loss)
+
+        cpa = cpa[:, :-1, :]
+        cpa = cpa.reshape(-1, 1)
+        history_cpa = torch.div(x_t[:, :, 22], x_t[:, :, 23] + 1e-10)
+        history_cpa = history_cpa.reshape(-1, 1)
+        time_left = x_t[:, :, 0]
+        time_left = time_left.reshape(-1, 1)
+        pred_all_cpa_temp = time_left * pred_a_t
+        time_left = torch.ones_like(time_left) - time_left
+        pred_all_cpa_history = time_left * history_cpa
+        pred_all_cpa = pred_all_cpa_temp + pred_all_cpa_history
+        pred_all_cpa = torch.where(pred_all_cpa <= cpa, 0, pred_all_cpa)
+        cpa_constraint_loss = F.mse_loss(pred_all_cpa, cpa)
+
+        loss = (1/3) * (diffuse_loss + inv_loss + cpa_constraint_loss)
+
+        # loss = (1 / 2) * (diffuse_loss + inv_loss)
 
         return loss, info, (diffuse_loss, inv_loss)
 

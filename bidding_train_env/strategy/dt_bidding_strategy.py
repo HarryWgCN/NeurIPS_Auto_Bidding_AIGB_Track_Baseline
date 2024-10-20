@@ -34,7 +34,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
         with open(picklePath, 'rb') as f:
             normalize_dict = pickle.load(f)
         self.model = DecisionTransformer(state_dim=16, act_dim=1, state_mean=normalize_dict["state_mean"],
-                                         state_std=normalize_dict["state_std"])
+                                         state_std=normalize_dict["state_std"]).eval()
         self.model.load_net(model_path)
 
     def reset(self):

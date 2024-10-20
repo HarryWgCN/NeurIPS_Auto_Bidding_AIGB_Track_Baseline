@@ -42,7 +42,7 @@ def run_test(i):
     print(agent.name)
  # ----------------------------------------- stimulate agent init ↓----------------------------------------
     # 每类模拟agent的个数    
-    stimulate_agent_num = 3
+    stimulate_agent_num = 1
     # baseline 模型以及budget samples的路径
     dt_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DTtest/dt.pt'
     pkl_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DTtest/normalize_dict.pkl'

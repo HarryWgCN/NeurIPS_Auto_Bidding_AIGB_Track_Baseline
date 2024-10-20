@@ -19,7 +19,7 @@ class base_dd_bidding_strategy(BaseBiddingStrategy):
         model_path = os.path.join(dir_name, "saved_model", "DDtest", "diffuser.pt")
         model_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DDtest/diffuser.pt'
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model = base_diffuser()
+        self.model = base_diffuser().eval()
         self.model.load_net(model_path,device =self.device)
         self.state_dim = 16
         self.input = np.zeros((48,self.state_dim+1))

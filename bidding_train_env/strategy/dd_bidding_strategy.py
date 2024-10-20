@@ -23,6 +23,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         self.model.load_net(model_path, device=self.device)
         self.state_dim = 24
         self.input = np.zeros((48, self.state_dim + 1))
+        self.cpa = cpa
 
     def reset(self):
         self.remaining_budget = self.budget
@@ -152,5 +153,7 @@ class DdBiddingStrategy(BaseBiddingStrategy):
         alpha = self.model(x, cpa_tensor)
         alpha = alpha.item()
         alpha = max(0, alpha)
+        # alpha = max(0, self.cpa) # truncating
+        # alpha = 0.9 * self.cpa + 0.1 * alpha # weighting
         bids = alpha * pValues
         return bids
