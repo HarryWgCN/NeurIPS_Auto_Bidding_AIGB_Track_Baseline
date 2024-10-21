@@ -507,7 +507,7 @@ class GaussianInvDynDiffusion(nn.Module):
 
         # loss = (1 / 2) * (diffuse_loss + inv_loss)
 
-        return loss, info, (diffuse_loss, inv_loss)
+        return loss, info, (diffuse_loss, inv_loss, cpa_constraint_loss)
 
 
 class DFUSER(nn.Module):
@@ -572,6 +572,7 @@ class DFUSER(nn.Module):
 
         self.diffuserModel_optimizer = torch.optim.Adam(self.diffuser.model.parameters(), lr=lr)
         self.invModel_optimizer = torch.optim.Adam(self.diffuser.inv_model.parameters(), lr=lr)
+        self.entire_optimizer = torch.optim.Adam([{'params': self.diffuser.model.parameters(), 'lr': lr}, {'params': self.diffuser.inv_model.parameters(), 'lr': lr}])
 
     def toCuda(self):
         self.diffuser.cuda()
@@ -587,15 +588,19 @@ class DFUSER(nn.Module):
             masks = masks.cuda()
         x = torch.cat([actions, states], dim=-1)
         cond = torch.ones_like(states[:, 0], device=states.device)[:, None, :]
-        loss, infos, (diffuse_loss, inv_loss) = self.diffuser.loss(x, cond, cpa, returns=returns, masks=masks)
+        loss, infos, (diffuse_loss, inv_loss, cpa_constraint_loss) = self.diffuser.loss(x, cond, cpa, returns=returns, masks=masks)
 
-        inv_loss.backward()
-        self.invModel_optimizer.step()
-        self.invModel_optimizer.zero_grad()
+        loss.backward()
+        self.entire_optimizer.step()
+        self.entire_optimizer.zero_grad()
 
-        diffuse_loss.backward()
-        self.diffuserModel_optimizer.step()
-        self.diffuserModel_optimizer.zero_grad()
+        # inv_loss.backward()
+        # self.invModel_optimizer.step()
+        # self.invModel_optimizer.zero_grad()
+        #
+        # diffuse_loss.backward()
+        # self.diffuserModel_optimizer.step()
+        # self.diffuserModel_optimizer.zero_grad()
 
         return loss, (diffuse_loss, inv_loss)
 

@@ -5,6 +5,7 @@ import logging
 import time
 from bidding_train_env.strategy import PlayerBiddingStrategy 
 from bidding_train_env.strategy import DtBiddingStrategy
+from bidding_train_env.strategy import DdBiddingStrategy
 from bidding_train_env.strategy import CPABiddingStrategy
 from bidding_train_env.strategy import base_dd_bidding_strategy
 from bidding_train_env.dataloader.test_dataloader import TestDataLoader
@@ -38,11 +39,11 @@ def run_test(i):
     cost_all = 0
     dd_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DDtest/diffuser.pt'
     # 传入模型编号
-    agent = PlayerBiddingStrategy()
+    agent = CPABiddingStrategy()
     print(agent.name)
  # ----------------------------------------- stimulate agent init ↓----------------------------------------
     # 每类模拟agent的个数    
-    stimulate_agent_num = 1
+    stimulate_agent_num = 2
     # baseline 模型以及budget samples的路径
     dt_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DTtest/dt.pt'
     pkl_path = '/home/disk2/guoyuning-23/NeurIPS_Auto_Bidding_AIGB_Track_Baseline/saved_model/DTtest/normalize_dict.pkl'
@@ -67,7 +68,11 @@ def run_test(i):
         sample_i += 1
         cpa_agents.append(cpa_agent)
         
-        dd_agent = base_dd_bidding_strategy(budget=budget_cpa_sampled[sample_i][0], cpa=budget_cpa_sampled[sample_i][1])
+        # dd_agent = base_dd_bidding_strategy(budget=budget_cpa_sampled[sample_i][0], cpa=budget_cpa_sampled[sample_i][1])
+        # sample_i += 1
+        # dd_agents.append(dd_agent)
+
+        dd_agent = DdBiddingStrategy(budget=budget_cpa_sampled[sample_i][0], cpa=budget_cpa_sampled[sample_i][1])
         sample_i += 1
         dd_agents.append(dd_agent)
         
