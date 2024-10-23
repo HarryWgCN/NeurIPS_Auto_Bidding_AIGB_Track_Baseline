@@ -29,7 +29,7 @@ def run_test():
 
     data_loader = TestDataLoader(file_path='/home/disk2/auto-bidding/data/traffic_new_final/period-24.csv')
     env = OfflineEnv()
-    agent = ()
+    agent = PlayerBiddingStrategy(budget=100, cpa=8)
     print(agent.name)
 
     keys, test_dict = data_loader.keys, data_loader.test_dict

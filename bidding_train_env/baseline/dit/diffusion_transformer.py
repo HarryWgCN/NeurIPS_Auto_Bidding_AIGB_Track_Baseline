@@ -480,7 +480,7 @@ def DiT_S_2(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=2, num_heads=6, **kwargs)
 
 def DiT_S_4(step_len,dim_obs):
-    return DiT(input_size=(1, step_len), depth=12, in_channels=dim_obs, hidden_size=384, patch_size=1, num_heads=6)
+    return DiT(input_size=(1, step_len), depth=24, in_channels=dim_obs, hidden_size=384, patch_size=1, num_heads=6)
 
 def DiT_S_8(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=1, num_heads=6, **kwargs)

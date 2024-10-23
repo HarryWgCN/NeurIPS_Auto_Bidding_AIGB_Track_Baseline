@@ -15,7 +15,7 @@ class DtBiddingStrategy(BaseBiddingStrategy):
     Decision-Transformer-PlayerStrategy
     """
 
-    def __init__(self, i,budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1, base_model_path='', base_pkl_path = ''):
+    def __init__(self,budget=100, name="Decision-Transformer-PlayerStrategy", cpa=2, category=1, base_model_path='', base_pkl_path = ''):
         super().__init__(budget, name, cpa, category)
 
         file_name = os.path.dirname(os.path.realpath(__file__))

@@ -52,8 +52,8 @@ class TestDataLoader:
         """
         # always overwrite
         tem = pd.read_csv(self.file_path)
-        with open(self.raw_data_path, 'wb') as file:
-            pickle.dump(tem, file)
+        # with open(self.raw_data_path, 'wb') as file:
+        #     pickle.dump(tem, file)
         return tem
     #对数据进行分组和排序，返回键列表和字典
     def _get_test_data_dict(self):

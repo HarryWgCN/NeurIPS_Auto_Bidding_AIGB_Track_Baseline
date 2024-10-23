@@ -501,7 +501,8 @@ class GaussianInvDynDiffusion(nn.Module):
         pred_all_cpa_history = time_left * history_cpa
         pred_all_cpa = pred_all_cpa_temp + pred_all_cpa_history
         pred_all_cpa = torch.where(pred_all_cpa <= cpa, 0, pred_all_cpa)
-        cpa_constraint_loss = F.mse_loss(pred_all_cpa, cpa)
+        # cpa_constraint_loss = F.mse_loss(pred_all_cpa, cpa)
+        cpa_constraint_loss = 0
 
         loss = (1/3) * (diffuse_loss + inv_loss + cpa_constraint_loss)
 

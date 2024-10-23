@@ -4,15 +4,15 @@ import os
 import sys
 
 
-from run.run_evaluate import run_test
-# from run.ori_run_evaluate import run_test
+# from run.run_evaluate import run_test
+from run.ori_run_evaluate import run_test
 
 torch.manual_seed(1)
 np.random.seed(1)
 
 if __name__ == "__main__":
     # for i in range(0,100):
-    run_test('harry')
+    run_test()
     
 # test different epoch evaluate result
 
